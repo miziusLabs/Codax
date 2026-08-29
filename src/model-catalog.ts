@@ -3,7 +3,7 @@ import type { CodexModelContextOverride } from "./codex-integration";
 import {
   availableChatGptWebModelRoutes,
   CHATGPT_WEB_MODEL_PREFIX,
-  resolveChatGptWebContextLimits,
+  resolveChatGptWebModelContextLimits,
   type ChatGptWebModelRoute,
 } from "./chatgpt-web-models";
 
@@ -104,7 +104,7 @@ export function buildChatGptWebModel(
   if (!templateSlug || templateSlug.startsWith(CHATGPT_WEB_MODEL_PREFIX)) {
     throw new Error("ChatGPT Web model template must be a native Codex model");
   }
-  const limits = resolveChatGptWebContextLimits(route.backendModel, route.adapterEffort, config);
+  const limits = resolveChatGptWebModelContextLimits(route.backendModel, route.adapterEffort, config);
   const multiAgentVersion = routedSubagentVersion(template, config);
   const priority = routedModelPriority(template, route, config);
   const model: JsonObject = {
@@ -143,8 +143,8 @@ export function buildChatGptWebModel(
     default_service_tier: null,
   };
   // A native template's compaction hash describes OpenAI's native model contract, not this routed
-  // browser model. The explicit Web window above is owned by this adapter and never copied back to
-  // native models or the user's top-level model_context_window setting.
+  // browser model. The explicit Web model window above is owned by this adapter and never copied
+  // back to native models or the user's top-level model_context_window setting.
   delete model.comp_hash;
   delete model.availability_nux;
   return model;
