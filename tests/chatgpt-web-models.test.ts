@@ -37,7 +37,11 @@ describe("fixed ChatGPT Web model routes", () => {
       ["chatgpt-web/extra-high", "xhigh", "xhigh"],
       ["chatgpt-web/pro", "ultra", "max"],
     ]);
-    expect(CHATGPT_WEB_MODEL_ROUTES[0]?.displayName).toBe("ChatGPT Web — Instant");
+    expect(CHATGPT_WEB_MODEL_ROUTES.slice(0, 3).map(route => route.displayName)).toEqual([
+      "GPT-5.6 Sol",
+      "GPT-5.6 Sol",
+      "GPT-5.6 Sol",
+    ]);
   });
 
   test("exposes only Plus-eligible routes without the Pro account capability", () => {

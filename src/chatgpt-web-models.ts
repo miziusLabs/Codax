@@ -177,7 +177,7 @@ export const CHATGPT_WEB_LUNA_MODEL_ROUTE: ChatGptWebModelRoute = {
 export const CHATGPT_WEB_MODEL_ROUTES: readonly ChatGptWebModelRoute[] = [
   {
     slug: "chatgpt-web/light",
-    displayName: "ChatGPT Web — Instant",
+    displayName: "GPT-5.6 Sol",
     description: "ChatGPT Web Instant through the native Codex harness.",
     backendModel: CHATGPT_WEB_BACKEND_MODEL,
     codexEffort: "low",
@@ -186,7 +186,7 @@ export const CHATGPT_WEB_MODEL_ROUTES: readonly ChatGptWebModelRoute[] = [
   },
   {
     slug: "chatgpt-web/medium",
-    displayName: "ChatGPT Web — Medium",
+    displayName: "GPT-5.6 Sol",
     description: "ChatGPT Web Medium through the native Codex harness.",
     backendModel: CHATGPT_WEB_BACKEND_MODEL,
     codexEffort: "medium",
@@ -195,7 +195,7 @@ export const CHATGPT_WEB_MODEL_ROUTES: readonly ChatGptWebModelRoute[] = [
   },
   {
     slug: "chatgpt-web/high",
-    displayName: "ChatGPT Web — High",
+    displayName: "GPT-5.6 Sol",
     description: "ChatGPT Web High through the native Codex harness.",
     backendModel: CHATGPT_WEB_BACKEND_MODEL,
     codexEffort: "high",
