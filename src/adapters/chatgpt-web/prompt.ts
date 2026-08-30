@@ -210,7 +210,13 @@ function assistantContent(content: CodexAssistantContentPart[]): unknown[] {
   return content.map(part => {
     if (part.type === "text") return { type: "text", text: part.text };
     if (part.type === "thinking") return { type: "thinking_summary", text: part.thinking };
-    return { type: "tool_call", id: part.id, name: part.name, arguments: part.arguments };
+    return {
+      type: "tool_call",
+      id: part.id,
+      name: part.name,
+      ...(part.namespace ? { namespace: part.namespace } : {}),
+      arguments: part.arguments,
+    };
   });
 }
 
@@ -266,11 +272,18 @@ function messageEnvelope(
       role: "tool_result",
       tool_call_id: message.toolCallId,
       tool_name: message.toolName,
+      ...(message.toolNamespace ? { tool_namespace: message.toolNamespace } : {}),
       is_error: message.isError,
       content: inputContent(message.content, images, budget),
     };
   }
-  if (message.role === "assistant") return { role: "assistant", content: assistantContent(message.content) };
+  if (message.role === "assistant") {
+    return {
+      role: "assistant",
+      ...(message.phase ? { phase: message.phase } : {}),
+      content: assistantContent(message.content),
+    };
+  }
   return { role: message.role, content: inputContent(message.content, images, budget) };
 }
 
@@ -413,11 +426,6 @@ export function compileChatGptWebPrompt(
       "Do not claim a new local inspection, command, edit, or verification unless it actually appears in the task history. If the latest request requires fresh local-computer access or a local mutation, state only that exact limitation instead of inventing success.",
       "Otherwise perform the full requested research, analysis, or synthesis with every capability actually available to you; do not stop at a plan or progress report.",
     ];
-  const proDelegationContract = !parsed._compactionRequest && mode.effort === "max"
-    ? [
-      "Complete this task directly in the current parent response. Do not create, spawn, delegate to, or wait on sub-agents, parallel agents, background agents, or delegated workers, even if such tools are available. Use non-agent tools directly instead.",
-    ]
-    : [];
   const checkpointContract = captureLunaCheckpoint
     ? [
       "After the complete user-facing answer, append one private rolling task checkpoint for the next Luna turn.",
@@ -470,7 +478,6 @@ export function compileChatGptWebPrompt(
         commit: [
           ...sharedContract,
           ...transportContract,
-          ...proDelegationContract,
           ...checkpointContract,
           answerContract,
           ...transportResume,
@@ -482,7 +489,6 @@ export function compileChatGptWebPrompt(
     const text = [
       ...sharedContract,
       ...transportContract,
-      ...proDelegationContract,
       ...checkpointContract,
       answerContract,
       "<codex_context_json>",
