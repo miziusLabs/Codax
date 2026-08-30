@@ -15,6 +15,13 @@ test("the public launcher command uses the Electron bootstrap", () => {
   assert.equal(repositoryManifest.scripts.launcher, repositoryManifest.scripts.app);
 });
 
+test("launcher packaging keeps using the Bun executable that started the script", () => {
+  assert.match(repositoryManifest.scripts["app:package"], /\$npm_execpath/);
+  for (const script of ["build", "build:runtime", "package", "package:mac", "package:win", "package:linux"]) {
+    assert.match(manifest.scripts[script], /\$npm_execpath/);
+  }
+});
+
 test("the full verification gate audits launcher dependencies", () => {
   const verify = fs.readFileSync(path.join(repositoryRoot, "scripts", "verify.ts"), "utf8");
   assert.equal(manifest.scripts.audit, "bun audit");

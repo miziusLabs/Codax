@@ -42,7 +42,7 @@
     "smoke:subagents:live": "bun run scripts/smoke-codex-web-subagents.ts",
     "launcher": "bun run scripts/start-launcher.ts",
     "app": "bun run scripts/start-launcher.ts",
-    "app:package": "bun run --cwd launcher package",
+    "app:package": "\"$npm_execpath\" run --cwd launcher package",
     "app:smoke": "bun run --cwd launcher smoke:package",
     "launcher:dev": "bun run --cwd launcher dev",
     "launcher:audit": "bun run --cwd launcher audit",
