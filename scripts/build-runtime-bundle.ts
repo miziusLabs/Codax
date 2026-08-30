@@ -70,7 +70,17 @@ if (!browserHelperBuild.success) {
 
 copyFileSync(join(root, "package.json"), join(appDir, "package.json"));
 copyFileSync(join(root, "bun.lock"), join(appDir, "bun.lock"));
-const install = Bun.spawnSync([process.execPath, "install", "--production", "--frozen-lockfile", "--ignore-scripts"], {
+const install = Bun.spawnSync([
+  process.execPath,
+  "install",
+  "--production",
+  "--frozen-lockfile",
+  "--ignore-scripts",
+  "--registry",
+  "https://registry.npmjs.org",
+  "--network-concurrency",
+  "1",
+], {
   cwd: appDir,
   stdout: "pipe",
   stderr: "pipe",

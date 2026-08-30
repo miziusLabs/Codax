@@ -116,7 +116,7 @@ test("new DEV chats default to the cheapest account-supported browser model", ()
   expect(defaultDevChatModel({ ...defaultConfig("full"), solAvailable: false })).toBe("chatgpt-web/luna");
 });
 
-test("Bigger Context triples the DEV compaction window and fails closed for Luna", async () => {
+test("DEV compaction follows retained Sol model headroom and Bigger Context stays transport-only", async () => {
   const root = scratch("cgw-dev-bigger-context");
   const config = {
     ...defaultConfig("browser-only"),
@@ -137,17 +137,20 @@ test("Bigger Context triples the DEV compaction window and fails closed for Luna
   const store = new DevChatStore(join(root, "chats"));
   const normal = new DevChatDriver(config, store, factory, root);
   const normalState = normal.open("normal-window", "chatgpt-web/high").state;
-  expect(normal.status(normalState).autoCompactTokenLimit).toBe(95_000);
+  expect(normal.status(normalState)).toMatchObject({
+    autoCompactTokenLimit: 244_800,
+    contextWindow: 272_000,
+  });
 
   const biggerConfig = { ...config, experimentalBiggerContext: true };
   const bigger = new DevChatDriver(biggerConfig, store, factory, root, { biggerContext: true });
   const biggerState = bigger.open("bigger-window", "chatgpt-web/high").state;
   const biggerStatus = bigger.status(biggerState);
   expect(biggerStatus).toMatchObject({
-    autoCompactTokenLimit: 285_000,
-    contextWindow: 333_579,
+    autoCompactTokenLimit: 244_800,
+    contextWindow: 272_000,
   });
-  expect(biggerStatus.percent).toBe(Math.round((biggerStatus.inputTokens / 285_000) * 1_000) / 10);
+  expect(biggerStatus.percent).toBe(Math.round((biggerStatus.inputTokens / 244_800) * 1_000) / 10);
   const luna = new DevChatDriver({
     ...biggerConfig,
     solAvailable: false,
@@ -321,7 +324,7 @@ test("DEV driver uses shared browser methods and its own broker while an unrelat
   }
 });
 
-test("synthetic fill crosses the production threshold and triggers the real compact handler", async () => {
+test("synthetic fill crosses the retained Sol threshold and triggers the real compact handler", async () => {
   const root = scratch("cgw-dev-compact");
   const config = defaultConfig("full");
   let compactRuns = 0;
@@ -343,8 +346,8 @@ test("synthetic fill crosses the production threshold and triggers the real comp
   const store = new DevChatStore(join(root, "chats"));
   const driver = new DevChatDriver(config, store, factory, root);
   const state = driver.open("auto-compact", "chatgpt-web/light").state;
-  driver.fill(state, 30_000);
-  expect(driver.status(state).inputTokens).toBeGreaterThanOrEqual(32_000);
+  driver.fill(state, 240_000);
+  expect(driver.status(state).inputTokens).toBeGreaterThanOrEqual(244_800);
   const events: string[] = [];
   const result = await driver.send(state, "Continue after compacting the synthetic history.", event => events.push(event.type));
   expect(result).toMatchObject({ text: "DEV turn completed after compaction.", compactions: 1 });

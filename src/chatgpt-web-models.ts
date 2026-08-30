@@ -128,21 +128,22 @@ export function resolveChatGptWebContextLimits(
   );
 }
 
-/** Resolve the actual ChatGPT model window while retaining the practical Codex compaction point. */
+/**
+ * Resolve the ChatGPT model window exposed to Codex. Retained browser conversations already carry
+ * completed history inside ChatGPT, so normal follow-ups send only the suffix after the last
+ * assistant turn. Per-message browser transport ceilings therefore must not lower Codex's model-
+ * level compaction point; they remain enforced separately by resolveChatGptWebContextLimits().
+ */
 export function resolveChatGptWebModelContextLimits(
   backendModel: ChatGptWebBackendModel,
-  effort: ChatGptWebAdapterEffort,
-  capabilities: ChatGptWebAccountCapabilities,
+  _effort: ChatGptWebAdapterEffort,
+  _capabilities: ChatGptWebAccountCapabilities,
 ): ChatGptWebContextLimits {
   const contextWindow = modelContextWindow(backendModel);
   if (backendModel === CHATGPT_WEB_LUNA_BACKEND_MODEL) {
     return contextLimits(contextWindow, contextWindow);
   }
-  const browserLimits = resolveChatGptWebContextLimits(backendModel, effort, capabilities);
-  return contextLimits(
-    contextWindow,
-    Math.min(browserLimits.autoCompactTokenLimit, maxModelAutoCompactTokenLimit(contextWindow)),
-  );
+  return contextLimits(contextWindow, maxModelAutoCompactTokenLimit(contextWindow));
 }
 
 /** Resolve limits of one visible ChatGPT composer message, independently of model context. */
