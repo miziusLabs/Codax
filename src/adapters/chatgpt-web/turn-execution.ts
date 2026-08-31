@@ -232,9 +232,7 @@ export class ChatGptTurnSession {
   private readonly outstandingById = new Map<string, BrokerToolRequest>();
   private readonly deliveredResultIds = new Set<string>();
   private outstandingReasoning: string[] = [];
-  private finalReasoning: string[] = [];
   private outstandingPrelude: AdapterEvent[] = [];
-  private finalPrelude: AdapterEvent[] = [];
   private settledBrowserOutcome?: ChatGptBrowserOutcome;
   private settledPhysical = false;
   private tail: Promise<void> = Promise.resolve();
@@ -335,22 +333,6 @@ export class ChatGptTurnSession {
 
   eventsForOutstandingReplay(): AdapterEvent[] {
     return [...this.outstandingPrelude];
-  }
-
-  setFinalReasoning(reasoning: string[]): void {
-    this.finalReasoning = [...reasoning];
-  }
-
-  reasoningForFinalReplay(): string[] {
-    return [...this.finalReasoning];
-  }
-
-  setFinalEvents(events: AdapterEvent[]): void {
-    this.finalPrelude = [...events];
-  }
-
-  eventsForFinalReplay(): AdapterEvent[] {
-    return [...this.finalPrelude];
   }
 
   roundEvents(key: string): AdapterEvent[] {
@@ -635,20 +617,22 @@ export class ChatGptTurnSessions {
     session.cancel();
     const retirement = session.physicalSettlement;
     this.retirements.set(key, retirement);
-    void retirement.then(() => {
+    const clearRetirement = () => {
       if (this.retirements.get(key) === retirement) this.retirements.delete(key);
-    });
+    };
+    void retirement.then(clearRetirement, clearRetirement);
     if (session.ownerKey) {
       const previous = this.ownerRetirements.get(session.ownerKey);
       const ownerRetirement = previous
         ? Promise.all([previous, retirement]).then(() => undefined)
         : retirement;
       this.ownerRetirements.set(session.ownerKey, ownerRetirement);
-      void ownerRetirement.then(() => {
+      const clearOwnerRetirement = () => {
         if (this.ownerRetirements.get(session.ownerKey!) === ownerRetirement) {
           this.ownerRetirements.delete(session.ownerKey!);
         }
-      });
+      };
+      void ownerRetirement.then(clearOwnerRetirement, clearOwnerRetirement);
     }
     return retirement;
   }

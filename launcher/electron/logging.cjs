@@ -142,6 +142,11 @@ function readRecent(filePath) {
 
 function createLogger({ filePath, publish }) {
   const records = readRecent(filePath);
+  let fileSizeBytes = 0;
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
+    fileSizeBytes = fs.statSync(filePath, { throwIfNoEntry: false })?.size ?? 0;
+  } catch {}
 
   const append = (level, event, detail = {}) => {
     const record = {
@@ -152,14 +157,16 @@ function createLogger({ filePath, publish }) {
     };
     records.push(record);
     if (records.length > MAX_MEMORY_RECORDS) records.splice(0, records.length - MAX_MEMORY_RECORDS);
+    const line = `${JSON.stringify(record)}\n`;
+    const lineBytes = Buffer.byteLength(line);
     try {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
-      const stat = fs.statSync(filePath, { throwIfNoEntry: false });
-      if (stat && stat.size >= MAX_LOG_BYTES) {
+      if (fileSizeBytes > 0 && fileSizeBytes + lineBytes > MAX_LOG_BYTES) {
         fs.rmSync(`${filePath}.1`, { force: true });
         renameAtomicFile(filePath, `${filePath}.1`);
+        fileSizeBytes = 0;
       }
-      fs.appendFileSync(filePath, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+      fs.appendFileSync(filePath, line, { mode: 0o600 });
+      fileSizeBytes += lineBytes;
     } catch {}
     publish?.(record);
     return record;

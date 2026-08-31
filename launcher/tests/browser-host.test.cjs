@@ -394,6 +394,47 @@ test("zoomed renderer bounds are converted back to native window coordinates", (
   );
 });
 
+test("unchanged browser bounds do not trigger native view work or renderer resize events", () => {
+  const calls = [];
+  const fixture = Object.assign(Object.create(BrowserHost.prototype), {
+    boundsReady: true,
+    bounds: { x: 200, y: 60, width: 800, height: 500 },
+    window: { getContentSize: () => [1200, 800] },
+    view: {
+      setBounds: () => calls.push("set-bounds"),
+      webContents: { executeJavaScript: () => calls.push("resize") },
+    },
+    authView: null,
+    syncViewVisibility: () => calls.push("sync"),
+  });
+
+  BrowserHost.prototype.setBounds.call(fixture, fixture.bounds);
+
+  assert.deepEqual(calls, []);
+});
+
+test("unchanged browser state does not republish an IPC snapshot", () => {
+  let publishes = 0;
+  const fixture = Object.assign(Object.create(BrowserHost.prototype), {
+    visible: false,
+    surfaceActive: true,
+    state: {
+      status: "ready",
+      loading: false,
+      visible: false,
+      surfaceActive: true,
+    },
+    snapshot: () => ({ status: "ready" }),
+    publishState: () => { publishes += 1; },
+  });
+
+  BrowserHost.prototype.setState.call(fixture, { status: "ready", loading: false });
+  assert.equal(publishes, 0);
+
+  BrowserHost.prototype.setState.call(fixture, { loading: true });
+  assert.equal(publishes, 1);
+});
+
 test("shell zoom shortcuts recognize native CommandOrControl keys only", () => {
   const keyDown = { type: "keyDown", key: "=", meta: true, control: false, alt: false };
 
@@ -1013,18 +1054,50 @@ test("a live turn heartbeat refreshes its lease and rejects another helper", () 
   const fixture = Object.assign(Object.create(BrowserHost.prototype), {
     turnTabs: new Map([[tab.id, tab]]),
     closedTurnOwners: new Map(),
-    snapshot: () => ({ activeTabId: tab.id }),
+    snapshot: () => assert.fail("heartbeats must not build browser snapshots"),
   });
 
   const before = Date.now();
-  const snapshot = BrowserHost.prototype.heartbeatTurn.call(fixture, tab.traceId, tab.helperPid);
+  const result = BrowserHost.prototype.heartbeatTurn.call(fixture, tab.traceId, tab.helperPid);
 
-  assert.deepEqual(snapshot, { activeTabId: tab.id });
+  assert.equal(result, undefined);
   assert.ok(tab.lastHeartbeatAt >= before);
   assert.throws(
     () => BrowserHost.prototype.heartbeatTurn.call(fixture, tab.traceId, 445),
     /ownership mismatch: expected 444, received 445/,
   );
+});
+
+test("turn lease sweeping is inactive while the browser host has no turn tabs", () => {
+  const fixture = Object.assign(Object.create(BrowserHost.prototype), {
+    turnTabs: new Map(),
+    turnLeaseSweep: null,
+  });
+
+  BrowserHost.prototype.ensureTurnLeaseSweep.call(fixture);
+  assert.equal(fixture.turnLeaseSweep, null);
+
+  fixture.turnTabs.set("tab", { id: "tab" });
+  BrowserHost.prototype.ensureTurnLeaseSweep.call(fixture);
+  assert.ok(fixture.turnLeaseSweep);
+
+  fixture.turnTabs.clear();
+  BrowserHost.prototype.stopTurnLeaseSweepIfIdle.call(fixture);
+  assert.equal(fixture.turnLeaseSweep, null);
+});
+
+test("closed turn ownership evidence is bounded", () => {
+  const fixture = Object.assign(Object.create(BrowserHost.prototype), {
+    closedTurnOwners: new Map(),
+  });
+
+  for (let index = 0; index < 300; index += 1) {
+    BrowserHost.prototype.rememberClosedTurnOwner.call(fixture, `trace-${index}`, index);
+  }
+
+  assert.equal(fixture.closedTurnOwners.size, 256);
+  assert.equal(fixture.closedTurnOwners.has("trace-0"), false);
+  assert.equal(fixture.closedTurnOwners.get("trace-299"), 299);
 });
 
 test("an uninitialized browser surface is reaped instead of remaining as a gray orphan tab", () => {

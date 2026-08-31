@@ -1,5 +1,6 @@
 export class AsyncEventQueue<T> implements AsyncIterable<T> {
   private readonly buffered: T[] = [];
+  private bufferedOffset = 0;
   private readonly waiters: Array<(result: IteratorResult<T>) => void> = [];
   private closed = false;
 
@@ -12,7 +13,9 @@ export class AsyncEventQueue<T> implements AsyncIterable<T> {
       waiter({ value, done: false });
       return;
     }
-    if (this.buffered.length >= this.maxBuffered) throw new Error("Adapter event backlog exceeded");
+    if (this.buffered.length - this.bufferedOffset >= this.maxBuffered) {
+      throw new Error("Adapter event backlog exceeded");
+    }
     this.buffered.push(value);
   }
 
@@ -31,8 +34,16 @@ export class AsyncEventQueue<T> implements AsyncIterable<T> {
   [Symbol.asyncIterator](): AsyncIterator<T> {
     return {
       next: () => {
-        const value = this.buffered.shift();
-        if (value !== undefined) return Promise.resolve({ value, done: false });
+        if (this.bufferedOffset < this.buffered.length) {
+          const value = this.buffered[this.bufferedOffset++]!;
+          // Avoid Array.shift()'s O(n) copy on every streamed event. Compact only after a
+          // meaningful consumed prefix has accumulated, keeping steady-state dequeue amortized O(1).
+          if (this.bufferedOffset >= 1_024 && this.bufferedOffset * 2 >= this.buffered.length) {
+            this.buffered.splice(0, this.bufferedOffset);
+            this.bufferedOffset = 0;
+          }
+          return Promise.resolve({ value, done: false });
+        }
         if (this.closed) return Promise.resolve({ value: undefined, done: true });
         return new Promise(resolve => this.waiters.push(resolve));
       },

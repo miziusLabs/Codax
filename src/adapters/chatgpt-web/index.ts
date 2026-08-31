@@ -687,8 +687,6 @@ export function createChatGptWebAdapter(
               throw new Error("ChatGPT browser Markdown stream did not reproduce the completed answer");
             }
             const reasoning = session.roundReasoning(roundKey);
-            session.setFinalReasoning(reasoning);
-            session.setFinalEvents(session.roundEvents(roundKey));
             emitRoundBatch(buffer => emitBrowserCompletion(
               settled,
               estimateChatGptWebUsage(currentUsageInput(parsed), { answer: settled.answer, reasoning }, turnCapabilities),
@@ -785,8 +783,6 @@ export function createChatGptWebAdapter(
               emitNewText(session.runtime.text.drain());
               if (next.type === "browser") {
                 const completedOutcome = next.outcome;
-                session.setFinalReasoning(roundReasoning);
-                session.setFinalEvents(session.roundEvents(roundKey));
                 if (turnToken) await broker.revoke(turnToken);
                 if (completedOutcome.type === "error") throw completedOutcome.error;
                 if (session.runtime.text.value() !== completedOutcome.answer) {

@@ -101,6 +101,7 @@ test("browser control server authenticates and owns turn visibility", async () =
     ]);
     assert.equal(logs.some(([, event]) => event === "browser.turn_started"), true);
     assert.equal(logs.some(([, event]) => event === "browser.turn_ended"), true);
+    assert.equal(logs.some(([, event]) => event === "browser.turn_heartbeat"), false);
   } finally {
     await server.close();
   }

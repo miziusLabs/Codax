@@ -143,6 +143,45 @@ test("settled replay sessions expire from their last use instead of their creati
   sessions.clear();
 });
 
+test("failed physical retirement does not leak session retirement registry entries", async () => {
+  const sessions = new ChatGptTurnSessions();
+  let rejectPhysical!: (error: Error) => void;
+  const physicalSettlement = new Promise<void>((_resolve, reject) => { rejectPhysical = reject; });
+  sessions.getOrCreate("failed-retirement", () => ({
+    mode: "read-only",
+    browser: Promise.resolve("done"),
+    physicalSettlement,
+    trace: new ChatGptTraceFeed(),
+    text: new ChatGptTextFeed(),
+    cancel: () => {},
+  }), "trace_failed_retirement", "owner-failed-retirement");
+
+  const retirement = sessions.retireAndWait("failed-retirement");
+  rejectPhysical(new Error("physical cleanup failed"));
+  expect(retirement).rejects.toThrow("physical cleanup failed");
+  await retirement.catch(() => {});
+  await sessions.waitForRetirement("failed-retirement");
+
+  let replacementStarts = 0;
+  await sessions.getOrCreateAfterOwnerRetirement(
+    "replacement",
+    "owner-failed-retirement",
+    () => {
+      replacementStarts += 1;
+      return {
+        mode: "read-only" as const,
+        browser: Promise.resolve("replacement"),
+        physicalSettlement: Promise.resolve(),
+        trace: new ChatGptTraceFeed(),
+        text: new ChatGptTextFeed(),
+        cancel: () => {},
+      };
+    },
+  );
+  expect(replacementStarts).toBe(1);
+  sessions.clear();
+});
+
 test("turn broker creates its private runtime directory on a cold start", async () => {
   const root = mkdtempSync(join(tmpdir(), "cgw-broker-"));
   const socketPath = defaultBrokerEndpoint(root);

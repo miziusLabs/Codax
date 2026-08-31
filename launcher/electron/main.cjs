@@ -86,6 +86,9 @@ let cdpPort = 0;
 let lastOperation = null;
 let catalogVerificationTimer = null;
 let catalogVerificationInFlight = false;
+let catalogVerificationGeneration = 0;
+const CATALOG_VERIFICATION_MIN_DELAY_MS = 2_000;
+const CATALOG_VERIFICATION_MAX_DELAY_MS = 30_000;
 
 function findFreePort() {
   return new Promise((resolve, reject) => {
@@ -112,19 +115,34 @@ function publishOperation(operation) {
 }
 
 function stopCatalogVerificationMonitor() {
-  if (catalogVerificationTimer) clearInterval(catalogVerificationTimer);
+  catalogVerificationGeneration += 1;
+  if (catalogVerificationTimer) clearTimeout(catalogVerificationTimer);
   catalogVerificationTimer = null;
 }
 
 function startCatalogVerificationMonitor({ logger, stateStore }) {
   stopCatalogVerificationMonitor();
+  const generation = catalogVerificationGeneration;
+  let delayMs = CATALOG_VERIFICATION_MIN_DELAY_MS;
+  const schedule = () => {
+    if (generation !== catalogVerificationGeneration || catalogVerificationTimer) return;
+    catalogVerificationTimer = setTimeout(() => {
+      catalogVerificationTimer = null;
+      void check();
+    }, delayMs);
+    catalogVerificationTimer.unref?.();
+  };
   const check = async () => {
+    if (generation !== catalogVerificationGeneration) return;
     const current = stateStore.read();
     if (current.coreSetupComplete !== true || current.codexCatalogVerified === true) {
       stopCatalogVerificationMonitor();
       return;
     }
-    if (catalogVerificationInFlight || !runtimeSupervisor) return;
+    if (catalogVerificationInFlight || !runtimeSupervisor) {
+      schedule();
+      return;
+    }
     catalogVerificationInFlight = true;
     try {
       const config = runtimeSupervisor.readConfig();
@@ -141,16 +159,19 @@ function startCatalogVerificationMonitor({ logger, stateStore }) {
       });
       send("launcher:state-changed", state);
       stopCatalogVerificationMonitor();
+      return;
     } catch (error) {
       logger.debug("codex.model_catalog_verification_pending", {
         message: error instanceof Error ? error.message : String(error),
       });
     } finally {
       catalogVerificationInFlight = false;
+      if (generation === catalogVerificationGeneration) {
+        schedule();
+        delayMs = Math.min(CATALOG_VERIFICATION_MAX_DELAY_MS, delayMs * 2);
+      }
     }
   };
-  catalogVerificationTimer = setInterval(() => { void check(); }, 2_000);
-  catalogVerificationTimer.unref?.();
   void check();
 }
 
@@ -365,7 +386,6 @@ function registerIpc({ logger, stateStore }) {
     browser: browserHost?.snapshot() ?? null,
     connectorName: runtimeHost.browserConnectorName(),
     mcpCredentialsConfigured: runtimeHost?.mcpCredentialsConfigured() ?? false,
-    logs: logger.recent(),
     urls: { github: GITHUB_URL, x: X_URL, connectors: CONNECTORS_URL, tunnels: TUNNELS_URL, keys: KEYS_URL },
     platform: process.platform,
     packaged: app.isPackaged,

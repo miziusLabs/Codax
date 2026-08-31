@@ -24,6 +24,7 @@ const IDLE_BROWSER_URL = "about:blank#codex-web-gpt-browser-host";
 const MAX_BROWSER_VIEW_DIMENSION = 16_384;
 const MAX_BROWSER_TABS = 5;
 const MAX_CANCELLED_TURN_TRACES = 256;
+const MAX_CLOSED_TURN_TRACES = 256;
 const HIDDEN_TURN_VIEWPORT = Object.freeze({ width: 800, height: 600 });
 // These are lease/initialization guards only. They do not limit a live ChatGPT turn: active turns
 // stay alive as long as the helper keeps heartbeating. They only reclaim a blank surface or a turn
@@ -240,8 +241,7 @@ class BrowserHost {
     this.authView = null;
     this.authNavigationError = null;
     this.homeNavigationTimeout = null;
-    this.turnLeaseSweep = setInterval(() => this.reapExpiredTurnTabs(), TURN_HEARTBEAT_SWEEP_MS);
-    this.turnLeaseSweep.unref?.();
+    this.turnLeaseSweep = null;
     this.boundsReady = false;
     this.bounds = { x: 0, y: 0, width: 1, height: 1 };
     this.state = {
@@ -334,7 +334,7 @@ class BrowserHost {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
-        spellcheck: true,
+        spellcheck: false,
         backgroundThrottling: false,
       },
     });
@@ -362,6 +362,7 @@ class BrowserHost {
       lastHeartbeatAt: Date.now(),
     };
     this.turnTabs.set(id, tab);
+    this.ensureTurnLeaseSweep();
     this.window.contentView.addChildView(view);
     this.presentTurnView(tab, false);
     view.webContents.setZoomFactor(this.state.zoomFactor);
@@ -813,13 +814,41 @@ class BrowserHost {
   }
 
   setState(patch) {
+    const nextVisible = this.visible;
+    const nextSurfaceActive = this.surfaceActive;
+    const changed = Object.entries(patch).some(([key, value]) => this.state[key] !== value)
+      || this.state.visible !== nextVisible
+      || this.state.surfaceActive !== nextSurfaceActive;
+    if (!changed) return;
     this.state = {
       ...this.state,
       ...patch,
-      visible: this.visible,
-      surfaceActive: this.surfaceActive,
+      visible: nextVisible,
+      surfaceActive: nextSurfaceActive,
     };
     this.publishState?.(this.snapshot());
+  }
+
+  ensureTurnLeaseSweep() {
+    if (this.turnLeaseSweep || this.turnTabs.size === 0) return;
+    this.turnLeaseSweep = setInterval(() => this.reapExpiredTurnTabs(), TURN_HEARTBEAT_SWEEP_MS);
+    this.turnLeaseSweep.unref?.();
+  }
+
+  stopTurnLeaseSweepIfIdle() {
+    if (this.turnTabs.size > 0 || !this.turnLeaseSweep) return;
+    clearInterval(this.turnLeaseSweep);
+    this.turnLeaseSweep = null;
+  }
+
+  rememberClosedTurnOwner(traceId, helperPid) {
+    this.closedTurnOwners.delete(traceId);
+    this.closedTurnOwners.set(traceId, helperPid);
+    while (this.closedTurnOwners.size > MAX_CLOSED_TURN_TRACES) {
+      const oldest = this.closedTurnOwners.keys().next();
+      if (oldest.done) break;
+      this.closedTurnOwners.delete(oldest.value);
+    }
   }
 
   heartbeatTurn(traceId, helperPid) {
@@ -834,7 +863,6 @@ class BrowserHost {
     }
     if (tab.status !== "running") throw new Error(`Browser turn ${traceId} is no longer running`);
     tab.lastHeartbeatAt = Date.now();
-    return this.snapshot();
   }
 
   reapExpiredTurnTabs(now = Date.now()) {
@@ -864,10 +892,16 @@ class BrowserHost {
 
   setBounds(bounds, rendererZoomFactor = 1) {
     const [width, height] = this.window.getContentSize();
-    this.bounds = constrainBrowserBounds(
+    const nextBounds = constrainBrowserBounds(
       normalizeBounds(scaleBrowserBounds(bounds, rendererZoomFactor)),
       { width, height },
     );
+    if (this.boundsReady
+      && this.bounds.x === nextBounds.x
+      && this.bounds.y === nextBounds.y
+      && this.bounds.width === nextBounds.width
+      && this.bounds.height === nextBounds.height) return;
+    this.bounds = nextBounds;
     this.boundsReady = true;
     this.view.setBounds(this.bounds);
     this.authView?.setBounds(this.bounds);
@@ -969,7 +1003,7 @@ class BrowserHost {
     if (!this.turnTabs.has(tab.id)) return;
     this.turnTabs.delete(tab.id);
     if (abortRunning && tab.status === "running") {
-      this.closedTurnOwners.set(tab.traceId, tab.helperPid);
+      this.rememberClosedTurnOwner(tab.traceId, tab.helperPid);
       tab.status = "aborted";
     }
     try { this.window.contentView.removeChildView(tab.view); } catch {}
@@ -987,6 +1021,7 @@ class BrowserHost {
         this.hide?.();
       }
     }
+    this.stopTurnLeaseSweepIfIdle();
     this.syncViewVisibility();
     this.publishState?.(this.snapshot());
     this.writeDescriptor();
@@ -1223,6 +1258,10 @@ class BrowserHost {
       if (this.surfaceActive && this.boundsReady) return;
       await sleep(pollMs);
     }
+    // The renderer can publish its first bounds while this process is descheduled. Re-check once
+    // after the deadline before failing so an event-loop stall cannot turn a ready surface into a
+    // false timeout.
+    if (this.surfaceActive && this.boundsReady) return;
     throw new Error(
       "Embedded browser surface did not receive measured bounds before the operation",
     );
@@ -1779,6 +1818,7 @@ class BrowserHost {
     this.closeAuthView(this.authView, true);
     this.clearHomeNavigationTimeout();
     if (this.turnLeaseSweep) clearInterval(this.turnLeaseSweep);
+    this.turnLeaseSweep = null;
     for (const tab of this.turnTabs.values()) {
       try { this.window.contentView.removeChildView(tab.view); } catch {}
       if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();

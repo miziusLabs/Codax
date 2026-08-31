@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, LazyMotion, m } from "motion/react";
 import {
   useCallback,
   useEffect,
@@ -24,17 +24,17 @@ import type {
 const api = window.codexWebLauncher;
 const PANEL_TRANSITION = { duration: 0.3, ease: [0.16, 1, 0.3, 1] } as const;
 const COMPACT_SIDEBAR_QUERY = "(max-width: 820px)";
+const loadMotionFeatures = () => import("./motion-features").then((module) => module.default);
 const MCP_GUIDE_MEDIA = [
-  new URL("./assets/mcp-create-tunnel.gif", import.meta.url).href,
-  new URL("./assets/mcp-connect-connector.gif", import.meta.url).href,
-  new URL("./assets/mcp-connect-connector.gif", import.meta.url).href,
+  new URL("./assets/mcp-create-tunnel.webm", import.meta.url).href,
+  new URL("./assets/mcp-connect-connector.webm", import.meta.url).href,
+  new URL("./assets/mcp-connect-connector.webm", import.meta.url).href,
 ] as const;
 
 export function App() {
   const [snapshot, setSnapshot] = useState<LauncherSnapshot | null>(null);
   const [browser, setBrowser] = useState<BrowserState | null>(null);
   const [operation, setOperation] = useState<OperationState | null>(null);
-  const [logs, setLogs] = useState<LogRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,7 +44,6 @@ export function App() {
       if (cancelled) return;
       setSnapshot(next);
       setBrowser(next.browser);
-      setLogs(next.logs);
       setOperation(next.operation);
       if (next.operation?.status === "failed" && next.operation.name !== "mcp-verification") {
         setError(next.operation.message);
@@ -65,13 +64,11 @@ export function App() {
       setOperation(next);
       if (next.status === "failed" && next.name !== "mcp-verification") setError(next.message);
     });
-    const unsubscribeLog = api.onLog((record) => setLogs((current) => [...current.slice(-299), record]));
     return () => {
       cancelled = true;
       unsubscribeState();
       unsubscribeBrowser();
       unsubscribeOperation();
-      unsubscribeLog();
     };
   }, []);
 
@@ -93,40 +90,41 @@ export function App() {
   const copy = copyFor(language);
 
   return (
-    <div
-      className="app-root"
-      data-language={language}
-      data-platform={snapshot.platform}
-      data-profile={snapshot.profile}
-      data-theme="dark"
-    >
-      <AnimatePresence mode="wait">
-        {!snapshot.state.onboardingComplete ? (
-          <Onboarding
-            key="onboarding"
-            language={language}
-            setError={setError}
-            snapshot={snapshot}
-            updateState={updateState}
-          />
-        ) : (
-          <LauncherShell
-            browser={browser}
-            copy={copy}
-            key="launcher"
-            language={language}
-            logs={logs}
-            operation={operation}
-            setError={setError}
-            snapshot={snapshot}
-            updateState={updateState}
-          />
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {error ? <ErrorToast copy={copy} message={error} onDismiss={() => setError(null)} /> : null}
-      </AnimatePresence>
-    </div>
+    <LazyMotion features={loadMotionFeatures} strict>
+      <div
+        className="app-root"
+        data-language={language}
+        data-platform={snapshot.platform}
+        data-profile={snapshot.profile}
+        data-theme="dark"
+      >
+        <AnimatePresence mode="wait">
+          {!snapshot.state.onboardingComplete ? (
+            <Onboarding
+              key="onboarding"
+              language={language}
+              setError={setError}
+              snapshot={snapshot}
+              updateState={updateState}
+            />
+          ) : (
+            <LauncherShell
+              browser={browser}
+              copy={copy}
+              key="launcher"
+              language={language}
+              operation={operation}
+              setError={setError}
+              snapshot={snapshot}
+              updateState={updateState}
+            />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {error ? <ErrorToast copy={copy} message={error} onDismiss={() => setError(null)} /> : null}
+        </AnimatePresence>
+      </div>
+    </LazyMotion>
   );
 }
 
@@ -185,7 +183,7 @@ function Onboarding({
   };
 
   return (
-    <motion.main
+    <m.main
       animate={{ opacity: 1 }}
       className="welcome"
       exit={{ opacity: 0 }}
@@ -202,7 +200,7 @@ function Onboarding({
       </header>
 
       <AnimatePresence mode="wait">
-        <motion.section
+        <m.section
           animate={{ opacity: 1, y: 0 }}
           className="welcome-stage"
           exit={{ opacity: 0, y: -8 }}
@@ -249,7 +247,7 @@ function Onboarding({
               />
             </div>
           )}
-        </motion.section>
+        </m.section>
       </AnimatePresence>
 
       <footer className="welcome-footer">
@@ -271,7 +269,7 @@ function Onboarding({
           {isLanguage ? localized.continue : localized.finishWelcome}
         </PrimaryButton>
       </footer>
-    </motion.main>
+    </m.main>
   );
 }
 
@@ -279,7 +277,6 @@ function LauncherShell({
   browser,
   copy,
   language,
-  logs,
   operation,
   setError,
   snapshot,
@@ -288,7 +285,6 @@ function LauncherShell({
   browser: BrowserState | null;
   copy: Copy;
   language: Language;
-  logs: LogRecord[];
   operation: OperationState | null;
   setError: (error: string | null) => void;
   snapshot: LauncherSnapshot;
@@ -444,7 +440,7 @@ function LauncherShell({
   };
 
   return (
-    <motion.main
+    <m.main
       animate={{ opacity: 1 }}
       className={`app-shell${compactSidebar ? " is-compact" : ""}${sidebarOpen ? " is-sidebar-open" : ""}`}
       initial={{ opacity: 0 }}
@@ -466,7 +462,7 @@ function LauncherShell({
         />
       ) : null}
 
-      <motion.aside
+      <m.aside
         animate={{ width: sidebarOpen ? "var(--sidebar-width)" : 0 }}
         className="app-sidebar"
         initial={false}
@@ -499,7 +495,7 @@ function LauncherShell({
                 <SidebarItem
                   active={surface === "browser"}
                   badge={needsBrowser
-                    ? <ActionDot pulse tone="required" />
+                    ? <ActionDot tone="required" />
                     : browser?.status === "error"
                       ? <ActionDot tone="error" />
                       : null}
@@ -511,7 +507,7 @@ function LauncherShell({
               <SidebarGroup label={copy.configuration}>
                 <SidebarItem
                   active={surface === "setup"}
-                  badge={needsSetup ? <ActionDot pulse tone="required" /> : null}
+                  badge={needsSetup ? <ActionDot tone="required" /> : null}
                   icon="setup"
                   label={copy.setup}
                   onClick={() => navigateSurface("setup")}
@@ -539,11 +535,11 @@ function LauncherShell({
             </div>
           </div>
         </div>
-      </motion.aside>
+      </m.aside>
 
       <section className="workspace">
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div
+          <m.div
             animate={{ opacity: 1 }}
             className="surface-transition"
             exit={{ opacity: 0 }}
@@ -583,7 +579,7 @@ function LauncherShell({
                 updateState={updateState}
               />
             ) : null}
-            {surface === "activity" ? <ActivitySurface copy={copy} logs={logs} setError={setError} /> : null}
+            {surface === "activity" ? <ActivitySurface copy={copy} setError={setError} /> : null}
             {surface === "settings" ? (
               <SettingsSurface
                 copy={copy}
@@ -594,7 +590,7 @@ function LauncherShell({
                 updateState={updateState}
               />
             ) : null}
-          </motion.div>
+          </m.div>
         </AnimatePresence>
       </section>
 
@@ -620,7 +616,7 @@ function LauncherShell({
           />
         ) : null}
       </AnimatePresence>
-    </motion.main>
+    </m.main>
   );
 }
 
@@ -1064,11 +1060,19 @@ function McpSurface({
 
       <div className="mcp-stage">
         <div className="guide-media">
-          <img alt={`${copy.guideVideo}: ${steps[step]!.title}`} src={MCP_GUIDE_MEDIA[step]} />
+          <video
+            aria-label={`${copy.guideVideo}: ${steps[step]!.title}`}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            src={MCP_GUIDE_MEDIA[step]}
+          />
         </div>
 
         <AnimatePresence mode="wait" initial={false}>
-          <motion.section
+          <m.section
             animate={{ opacity: 1, x: 0 }}
             className="wizard-content"
             exit={{ opacity: 0, x: -8 }}
@@ -1184,7 +1188,7 @@ function McpSurface({
                 {doctor ? <DoctorSummary copy={copy} report={doctor} /> : null}
               </div>
             ) : null}
-          </motion.section>
+          </m.section>
         </AnimatePresence>
       </div>
 
@@ -1224,13 +1228,30 @@ function McpSurface({
 
 function ActivitySurface({
   copy,
-  logs,
   setError,
 }: {
   copy: Copy;
-  logs: LogRecord[];
   setError: (error: string | null) => void;
 }) {
+  const [logs, setLogs] = useState<LogRecord[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api!.logs(300).then((records) => {
+      if (!cancelled) setLogs(records);
+    }).catch((cause) => {
+      if (!cancelled) setError(messageOf(cause));
+    });
+    const unsubscribe = api!.onLog((record) => {
+      if (cancelled) return;
+      setLogs((current) => [...current.slice(-299), record]);
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [setError]);
+
   return (
     <ContentSurface subtitle={copy.activitySubtitle} title={copy.activityTitle}>
       <div className="section-heading activity-heading">
@@ -1758,8 +1779,8 @@ function StateDot({ state }: { state: "idle" | "ready" | "busy" | "error" }) {
   return <i aria-hidden="true" className={`state-dot is-${state}`} />;
 }
 
-function ActionDot({ pulse = false, tone }: { pulse?: boolean; tone: "required" | "optional" | "success" | "error" }) {
-  return <i aria-hidden="true" className={`action-dot is-${tone}${pulse ? " is-pulse" : ""}`} />;
+function ActionDot({ tone }: { tone: "required" | "optional" | "success" | "error" }) {
+  return <i aria-hidden="true" className={`action-dot is-${tone}`} />;
 }
 
 function BrandMark({ small = false }: { small?: boolean }) {
@@ -1777,7 +1798,7 @@ function BrandMark({ small = false }: { small?: boolean }) {
 
 function ErrorToast({ copy, message, onDismiss }: { copy: Copy; message: string; onDismiss: () => void }) {
   return (
-    <motion.div
+    <m.div
       animate={{ opacity: 1, y: 0 }}
       className="error-toast"
       exit={{ opacity: 0, y: 8 }}
@@ -1790,7 +1811,7 @@ function ErrorToast({ copy, message, onDismiss }: { copy: Copy; message: string;
         <p>{message}</p>
       </span>
       <button onClick={onDismiss} type="button">{copy.dismiss}</button>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -1806,7 +1827,7 @@ function SessionRefreshReminder({
   onLogout: () => void;
 }) {
   return (
-    <motion.aside
+    <m.aside
       animate={{ opacity: 1, y: 0 }}
       aria-live="polite"
       className="session-refresh-reminder"
@@ -1827,7 +1848,7 @@ function SessionRefreshReminder({
           {copy.logOut}
         </button>
       </div>
-    </motion.aside>
+    </m.aside>
   );
 }
 
@@ -1845,7 +1866,7 @@ function BiggerContextRecommendation({
   onClose: () => void;
 }) {
   return (
-    <motion.div
+    <m.div
       animate={{ opacity: 1 }}
       aria-describedby="bigger-context-recommendation-body"
       aria-labelledby="bigger-context-recommendation-title"
@@ -1856,7 +1877,7 @@ function BiggerContextRecommendation({
       role="dialog"
       transition={{ duration: 0.18 }}
     >
-      <motion.section
+      <m.section
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="bigger-context-recommendation"
         exit={{ opacity: 0, scale: 0.98, y: 6 }}
@@ -1879,8 +1900,8 @@ function BiggerContextRecommendation({
         <footer>
           <SecondaryButton disabled={busy} onClick={onClose}>{copy.close}</SecondaryButton>
         </footer>
-      </motion.section>
-    </motion.div>
+      </m.section>
+    </m.div>
   );
 }
 

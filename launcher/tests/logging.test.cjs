@@ -64,6 +64,28 @@ test("launcher activity restores valid records from the previous process", () =>
   }
 });
 
+test("launcher logging does not stat the log file for every record", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-logging-stat-"));
+  const filePath = path.join(root, "launcher.jsonl");
+  const originalStatSync = fs.statSync;
+  let statCalls = 0;
+  fs.statSync = (...args) => {
+    statCalls += 1;
+    return originalStatSync(...args);
+  };
+  try {
+    const logger = createLogger({ filePath });
+    const initializationCalls = statCalls;
+    logger.info("first");
+    logger.info("second");
+    assert.equal(statCalls, initializationCalls);
+    assert.equal(fs.readFileSync(filePath, "utf8").trim().split(/\r?\n/).length, 2);
+  } finally {
+    fs.statSync = originalStatSync;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("exported launcher logs remove local usernames, private ChatGPT titles, and URL paths", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-export-"));
   const filePath = path.join(root, "launcher.jsonl");

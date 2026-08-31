@@ -89,7 +89,6 @@ export interface LauncherSnapshot {
   browser: BrowserState | null;
   connectorName: string;
   mcpCredentialsConfigured: boolean;
-  logs: LogRecord[];
   urls: {
     github: string;
     x: string;

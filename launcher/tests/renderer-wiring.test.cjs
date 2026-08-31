@@ -17,6 +17,13 @@ test("embedded ChatGPT is measured only after its animated surface mounts", () =
   assert.match(appSource, /ref=\{browserSlotRef\}/);
 });
 
+test("Motion animation features are split out of the renderer startup path", () => {
+  assert.match(appSource, /import \{ AnimatePresence, LazyMotion, m \} from "motion\/react"/);
+  assert.match(appSource, /const loadMotionFeatures = \(\) => import\("\.\/motion-features"\)/);
+  assert.match(appSource, /<LazyMotion features=\{loadMotionFeatures\} strict>/);
+  assert.doesNotMatch(appSource, /\bmotion\./);
+});
+
 test("native clicks reach browser tabs instead of the window drag region", () => {
   assert.match(appSource, /draggable=\{surface !== "browser"\}/);
   assert.match(appSource, /className=\{`app-titlebar\$\{draggable \? " draggable" : ""\}`\}/);
@@ -90,6 +97,29 @@ test("MCP surfaces use the official local protocol mark", () => {
   assert.match(appSource, /<McpMark \/>[\s\S]*?copy\.mcpTitle/);
   assert.doesNotMatch(appSource, /<Icon name="mcp" \/>/);
   assert.match(stylesSource, /mask:\s*url\("\.\.\/assets\/mcp-mark\.svg"\)/);
+});
+
+test("MCP guide media uses compressed video instead of animated GIFs", () => {
+  assert.match(appSource, /mcp-create-tunnel\.webm/);
+  assert.match(appSource, /mcp-connect-connector\.webm/);
+  assert.match(appSource, /<video[\s\S]*?autoPlay[\s\S]*?loop[\s\S]*?muted[\s\S]*?preload="metadata"/);
+  assert.doesNotMatch(appSource, /mcp-(?:create-tunnel|connect-connector)\.gif/);
+  assert.match(stylesSource, /\.guide-media video\s*\{/);
+});
+
+test("launcher logs update React only while the Activity surface is mounted", () => {
+  const appStart = appSource.indexOf("export function App()");
+  const onboardingStart = appSource.indexOf("function Onboarding", appStart);
+  const appBody = appSource.slice(appStart, onboardingStart);
+  const activityStart = appSource.indexOf("function ActivitySurface");
+  const settingsStart = appSource.indexOf("function SettingsSurface", activityStart);
+  const activityBody = appSource.slice(activityStart, settingsStart);
+
+  assert.doesNotMatch(appBody, /onLog\(/);
+  assert.doesNotMatch(electronMain, /launcher:snapshot[\s\S]*?logs:\s*logger\.recent\(\)/);
+  assert.match(activityBody, /api!\.logs\(300\)/);
+  assert.match(activityBody, /api!\.onLog\(/);
+  assert.match(activityBody, /unsubscribe\(\)/);
 });
 
 test("the configured launcher exposes no persistent bridge opt-out", () => {
