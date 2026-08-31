@@ -1870,6 +1870,81 @@ test("streaming commentary resumes by delta after a transient DOM disappearance"
   ]);
 });
 
+test("visible DOM commentary preserves ChatGPT Markdown formatting", () => {
+  const tracker = new ChatGptVisibleTraceTracker(0);
+  expect(tracker.observe([{
+    kind: "commentary",
+    text: "Use bold, /stats, and docs.",
+    html: '<p>Use <strong>bold</strong>, <code>/stats</code>, and <a href="https://example.com/docs">docs</a>.</p>',
+  }], false, 1_000)).toEqual([{
+    kind: "commentary",
+    text: "Use **bold**, `/stats`, and [docs](https://example.com/docs).",
+  }]);
+});
+
+test("commentary waits for Markdown hydration before becoming stable", () => {
+  const tracker = new ChatGptVisibleTraceTracker(100);
+  expect(tracker.observe([{
+    kind: "commentary",
+    text: "Checking /stats",
+    html: "<p>Checking /stats</p>",
+  }], false, 1_000)).toEqual([]);
+  expect(tracker.observe([{
+    kind: "commentary",
+    text: "Checking /stats",
+    html: "<p>Checking <code>/stats</code></p>",
+  }], false, 1_050)).toEqual([]);
+  expect(tracker.observe([{
+    kind: "commentary",
+    text: "Checking /stats",
+    html: "<p>Checking <code>/stats</code></p>",
+  }], false, 1_150)).toEqual([{
+    kind: "commentary",
+    text: "Checking `/stats`",
+  }]);
+});
+
+test("Markdown commentary continuation uses formatted output offsets", () => {
+  const tracker = new ChatGptVisibleTraceTracker(0);
+  expect(tracker.observe([{
+    kind: "commentary",
+    text: "Checking /stats",
+    html: "<p>Checking <code>/stats</code></p>",
+  }], false, 1_000)).toEqual([{
+    kind: "commentary",
+    text: "Checking `/stats`",
+  }]);
+  expect(tracker.observe([{
+    kind: "commentary",
+    text: "Checking /stats and dates",
+    html: "<p>Checking <code>/stats</code> and dates</p>",
+  }], false, 1_010)).toEqual([{
+    kind: "commentary",
+    text: " and dates",
+    continuation: true,
+  }]);
+});
+
+test("Markdown commentary does not slice with plain-text offsets when formatting boundaries move", () => {
+  const tracker = new ChatGptVisibleTraceTracker(0);
+  expect(tracker.observe([{
+    kind: "commentary",
+    text: "Checking docs",
+    html: "<p>Checking <strong>docs</strong></p>",
+  }], false, 1_000)).toEqual([{
+    kind: "commentary",
+    text: "Checking **docs**",
+  }]);
+  expect(tracker.observe([{
+    kind: "commentary",
+    text: "Checking docs carefully",
+    html: "<p>Checking <strong>docs carefully</strong></p>",
+  }], false, 1_010)).toEqual([{
+    kind: "commentary",
+    text: "Checking **docs carefully**",
+  }]);
+});
+
 test("visible DOM trace emits a short-lived reasoning label on its first observation", () => {
   const tracker = new ChatGptVisibleTraceTracker(0);
   expect(tracker.observe([
@@ -1978,6 +2053,7 @@ test("response DOM separates streaming commentary from the final Markdown answer
   expect(workerSource).toContain("itemAnchor?.nextElementSibling");
   expect(workerSource).toContain("block.complete === true || index < blocks.length - 1");
   expect(workerSource).toContain("const traceByKey = new Map<string, ChatGptVisibleTraceBlock>()");
+  expect(workerSource).toContain('...(kind === "commentary" ? { html: candidate.innerHTML } : {})');
   expect(workerSource).toContain('uiControl: candidate.matches("button")');
   expect(workerSource).toContain("!overlapsRenderedAnswer(semantic)");
   expect(workerSource).toContain("!overlapsRenderedAnswer(container)");

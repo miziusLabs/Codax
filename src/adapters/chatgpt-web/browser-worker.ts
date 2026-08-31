@@ -17,6 +17,7 @@ import { estimateTokens } from "../../lib/token-estimate";
 import type { CodexProviderConfig } from "../../types";
 import { parseDataUrl } from "../image";
 import {
+  chatGptHtmlToMarkdown,
   ChatGptMarkdownBuffer,
   ChatGptMarkdownConsistencyError,
   type ChatGptMarkdownSegment,
@@ -935,6 +936,7 @@ export class ChatGptStoppedThinkingTracker {
 export interface ChatGptVisibleTraceBlock {
   kind: "answer" | "commentary" | "status";
   text: string;
+  html?: string;
   key?: string;
   complete?: boolean;
   uiControl?: boolean;
@@ -975,8 +977,8 @@ const absentResponseDomSnapshot = (): ChatGptResponseDomSnapshot => ({
 
 /** Convert the public ChatGPT turn DOM into append-only Codex reasoning summaries. */
 export class ChatGptVisibleTraceTracker {
-  private readonly emittedTrace = new Map<string, string>();
-  private readonly traceCandidates = new Map<string, { text: string; changedAt: number }>();
+  private readonly emittedTrace = new Map<string, { text: string; output: string }>();
+  private readonly traceCandidates = new Map<string, { text: string; output: string; changedAt: number }>();
 
   constructor(private readonly traceStabilityMs = 250) {}
 
@@ -999,9 +1001,15 @@ export class ChatGptVisibleTraceTracker {
         .trim();
       const text = block.kind === "status" ? stripped.replace(/\s+/g, " ") : stripped;
       if (!text) continue;
+      // Plain text remains the trace identity because ChatGPT can hydrate markup without changing
+      // the semantic commentary. Only commentary Markdown roots get a formatted emission value;
+      // status/action rows intentionally stay on traceText()'s aria/screen-reader representation.
+      const emittedText = block.kind === "commentary" && block.html
+        ? chatGptHtmlToMarkdown(block.html) || text
+        : text;
       let candidate = this.traceCandidates.get(slot);
-      if (!candidate || candidate.text !== text) {
-        candidate = { text, changedAt: now };
+      if (!candidate || candidate.text !== text || candidate.output !== emittedText) {
+        candidate = { text, output: emittedText, changedAt: now };
         this.traceCandidates.set(slot, candidate);
         if (!completionActionVisible && this.traceStabilityMs > 0) continue;
       }
@@ -1012,14 +1020,20 @@ export class ChatGptVisibleTraceTracker {
       if (!completionActionVisible && now - candidate.changedAt < this.traceStabilityMs) continue;
 
       const previous = this.emittedTrace.get(slot);
-      if (previous === text) continue;
-      this.emittedTrace.set(slot, text);
+      // A markup-only rewrite after emission cannot be retracted from Codex. Preserve the existing
+      // semantic dedupe behavior instead of duplicating the same commentary with richer markup.
+      if (previous?.text === text) continue;
+      this.emittedTrace.set(slot, { text, output: emittedText });
       const kind = block.kind === "commentary" ? "commentary" : "reasoning";
 
-      if (previous && text.startsWith(previous)) {
-        output.push({ kind, text: text.slice(previous.length), continuation: true });
+      // Never derive a Markdown slice from plain-text offsets. Formatting delimiters can move as a
+      // commentary root grows, so only emit a continuation when the formatted output itself grows
+      // append-only. Otherwise emit the complete new block as a fresh trace event.
+      if (previous && text.startsWith(previous.text) && emittedText.startsWith(previous.output)) {
+        const delta = emittedText.slice(previous.output.length);
+        if (delta) output.push({ kind, text: delta, continuation: true });
       } else {
-        output.push({ kind, text });
+        output.push({ kind, text: emittedText });
       }
     }
     return output;
@@ -2905,6 +2919,7 @@ export class ChatGptBrowserWorker {
         .map(([candidate, kind]) => ({
           kind,
           text: traceText(candidate),
+          ...(kind === "commentary" ? { html: candidate.innerHTML } : {}),
           key: traceKey(candidate, kind),
           ...(kind === "commentary" ? { complete: hasFollowingRenderedSibling(candidate) } : {}),
           // Footer controls such as the model picker and overflow menu are siblings of the final
