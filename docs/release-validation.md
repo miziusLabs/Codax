@@ -30,8 +30,8 @@ Run this list on a maintained Windows 11 x64 machine with a real ChatGPT account
    prove that the saved ChatGPT session and Codex route are still valid.
 9. Disconnect the bridge and prove that the exact previous Codex route is restored. Reconnect it
    and prove that the existing private MCP credentials are reused rather than replaced.
-10. Upgrade from the previous public release and prove that launcher state, browser state, Codex
-    settings, and MCP configuration survive the updater transaction.
+10. Upgrade from the previous public release with the release installer and prove that launcher
+    state, browser state, Codex settings, and MCP configuration survive the manual upgrade.
 
 Any failed or unexecuted item blocks a stable release. An alpha may ship with a named failed item
 only when the release notes describe the limitation and recovery path explicitly.
