@@ -372,7 +372,9 @@ test("large Markdown-rich context uses one plain-text editing command before exa
       calls.push(["evaluate", value]);
       calls.push(["evaluateOptions", options]);
       expect(typeof fn).toBe("function");
-      return true;
+      // document.execCommand() has a deprecated boolean return contract. Exact composer
+      // readback below, not this value, decides whether prompt attachment succeeded.
+      return false;
     },
   };
   const attachPrompt = (ChatGptBrowserWorker.prototype as unknown as {
@@ -395,10 +397,12 @@ test("large Markdown-rich context uses one plain-text editing command before exa
   ]);
   const workerSource = readFileSync(new URL("../src/adapters/chatgpt-web/browser-worker.ts", import.meta.url), "utf8");
   expect(workerSource).toContain('document.execCommand("insertText", false, value)');
+  expect(workerSource).toContain("range.selectNodeContents(element)");
+  expect(workerSource).toContain("selection.addRange(range)");
   expect(asserted).toBe(prompt);
 });
 
-test("plain-text editing command fails closed when the focused composer rejects it", async () => {
+test("plain-text editing command return value is not treated as attachment proof", async () => {
   const insertPromptText = (ChatGptBrowserWorker.prototype as unknown as {
     insertPromptText(page: unknown, text: string, abortSignal?: AbortSignal): Promise<void>;
   }).insertPromptText;
@@ -410,7 +414,7 @@ test("plain-text editing command fails closed when the focused composer rejects 
   await expect(insertPromptText.call({
     activeComposer: async () => composer,
   }, {}, "literal `markdown`"))
-    .rejects.toThrow("rejected the plain-text editing command");
+    .resolves.toBeUndefined();
 });
 
 test("compaction prompt attachment retries once only before submission evidence", async () => {

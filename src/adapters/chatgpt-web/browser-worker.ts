@@ -2488,25 +2488,32 @@ export class ChatGptBrowserWorker {
     // delimiters from textContent, and leave the next insertion outside the intended block. The
     // browser's plain-text editing command updates the same focused contenteditable atomically
     // without running those Markdown shortcuts. Exact readback below remains the authority.
-    const inserted = await composer.evaluate((element, value) => {
+    await composer.evaluate((element, value) => {
       const selection = window.getSelection();
-      if (
-        document.activeElement !== element
-        || !selection
-        || !selection.isCollapsed
-        || !selection.anchorNode
-        || !element.contains(selection.anchorNode)
-      ) {
-        return false;
+      if (!selection) return false;
+
+      const selectionIsUsable = () => document.activeElement === element
+        && selection.isCollapsed
+        && selection.anchorNode !== null
+        && element.contains(selection.anchorNode);
+      if (!selectionIsUsable()) {
+        // Lexical can replace the composer subtree while the launcher is settling. Playwright's
+        // focus then succeeds before Chromium has restored a caret inside the new contenteditable.
+        // Re-anchor only for that invalid-selection case; a valid connector caret must be kept.
+        element.focus();
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
       }
+      if (!selectionIsUsable()) return false;
       return document.execCommand("insertText", false, value);
     }, text, { timeout: 20_000 });
     throwIfPromptAttachmentAborted(abortSignal);
-    if (!inserted) {
-      throw new ChatGptPromptAttachmentIntegrityError(
-        "ChatGPT composer rejected the plain-text editing command",
-      );
-    }
+    // execCommand is deprecated and Chromium can report false even when the edit was committed.
+    // attachPrompt immediately performs an exact composer readback, which is the authoritative
+    // success check and still fails closed before anything can be submitted.
   }
 
   private async verifyConnectorExclusive(): Promise<string> {
