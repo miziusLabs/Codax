@@ -34,10 +34,25 @@ test("browser turn orchestration retains owned prompt insertion and semantic sub
     workerSource.indexOf("  private async sendAttachedPrompt("),
     workerSource.indexOf("  private async waitForMultipartAcknowledgement("),
   );
+  const sendSettled = sendAttachedPrompt.indexOf("await settleChatGptUi()");
+  const sendDeadline = sendAttachedPrompt.indexOf("CHATGPT_SEND_ENABLE_GRACE_MS", sendSettled);
+  const sessionChecked = sendAttachedPrompt.indexOf("await throwIfChatGptSessionFailureAlert(page)", sendDeadline);
+  const rateLimitChecked = sendAttachedPrompt.indexOf("await throwIfChatGptRateLimitDialog(page)", sessionChecked);
+  const enabledChecked = sendAttachedPrompt.indexOf("if (await sendButton.isEnabled()) break;", rateLimitChecked);
+  const sendReady = sendAttachedPrompt.indexOf('await captureDiagnostic?.("send-ready")');
   const sendActivated = sendAttachedPrompt.indexOf("submissionLifecycle?.onSendActivated?.()");
   const sendPressed = sendAttachedPrompt.indexOf('await sendButton.press("Enter")');
   const submissionWait = sendAttachedPrompt.indexOf("await this.waitForSubmissionAccepted(");
   const submitted = sendAttachedPrompt.indexOf("submissionLifecycle?.onSubmitted?.()");
+  expect(sendSettled).toBeGreaterThan(-1);
+  expect(sendDeadline).toBeGreaterThan(sendSettled);
+  expect(sessionChecked).toBeGreaterThan(sendDeadline);
+  expect(rateLimitChecked).toBeGreaterThan(sessionChecked);
+  expect(enabledChecked).toBeGreaterThan(rateLimitChecked);
+  expect(sendReady).toBeGreaterThan(enabledChecked);
+  expect(sendActivated).toBeGreaterThan(sendReady);
+  expect(sendAttachedPrompt).toContain("send button remained disabled after the complete prompt was attached");
+  expect(sendAttachedPrompt).not.toContain("send button is disabled after the complete prompt was attached");
   expect(sendActivated).toBeGreaterThan(-1);
   expect(sendActivated).toBeLessThan(sendPressed);
   expect(sendAttachedPrompt).toContain("await submissionLifecycle?.onSendActivated?.()");
@@ -1495,6 +1510,7 @@ test("unrelated ChatGPT alerts are not terminal", async () => {
 function toolConfirmationPage(options: {
   disappearAfterReads?: number;
   surface?: "dialog" | "card";
+  allowLabel?: "Allow once" | "Allow";
 } = {}): {
   page: Page;
   pressed: string[];
@@ -1502,14 +1518,23 @@ function toolConfirmationPage(options: {
   let reads = 0;
   let visible = true;
   const pressed: string[] = [];
-  const button = (name: string) => ({
-    last: () => button(name),
-    waitFor: async () => {},
-    press: async (key: string) => {
-      pressed.push(`${name}:${key}`);
-      visible = false;
-    },
-  });
+  const availableButtons = [options.allowLabel ?? "Allow once", "Deny"] as const;
+  const button = (name: string | RegExp) => {
+    const actualName = availableButtons.find(candidate => (
+      typeof name === "string" ? candidate === name : name.test(candidate)
+    ));
+    return {
+      last: () => button(name),
+      waitFor: async () => {
+        if (!actualName) throw new Error(`Approval button not found: ${String(name)}`);
+      },
+      press: async (key: string) => {
+        if (!actualName) throw new Error(`Approval button not found: ${String(name)}`);
+        pressed.push(`${actualName}:${key}`);
+        visible = false;
+      },
+    };
+  };
   const dialog = {
     filter: ({ hasText }: { hasText: string }) => {
       expect(hasText).toBe("Allow ChatGPT to use Codex Native?");
@@ -1521,7 +1546,7 @@ function toolConfirmationPage(options: {
       if (options.disappearAfterReads !== undefined && reads >= options.disappearAfterReads) visible = false;
       return visible;
     },
-    getByRole: (_role: string, input: { name: string }) => button(input.name),
+    getByRole: (_role: string, input: { name: string | RegExp }) => button(input.name),
     waitFor: async ({ state }: { state: string }) => {
       expect(state).toBe("hidden");
       expect(visible).toBeFalse();
@@ -1564,6 +1589,13 @@ test("explicit connector auto-approval still selects Allow once", async () => {
 
   expect(await resolveChatGptToolConfirmation(fixture.page, "Codex Native", true)).toBeTrue();
   expect(fixture.pressed).toEqual(["Allow once:Enter"]);
+});
+
+test("connector auto-approval accepts the current shortened Allow action", async () => {
+  const fixture = toolConfirmationPage({ allowLabel: "Allow" });
+
+  expect(await resolveChatGptToolConfirmation(fixture.page, "Codex Native", true)).toBeTrue();
+  expect(fixture.pressed).toEqual(["Allow:Enter"]);
 });
 
 test("auto-approval recognizes the observed non-dialog approval card", async () => {
