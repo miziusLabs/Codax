@@ -13,11 +13,20 @@ const {
 const {
   allowedAuthUrl,
   BrowserHost,
+  CHATGPT_VIEWPORT_CSS,
   isChatGptCloudflareChallengeResponse,
   isTemporaryChatUrl,
   navigationErrorForLog,
   navigationOriginForLog,
+  shouldBlockChatGptBackgroundRequest,
 } = require("../electron/browser-host.cjs");
+
+test("managed ChatGPT chrome hides sidebar and account controls", () => {
+  assert.match(CHATGPT_VIEWPORT_CSS, /data-codex-web-gpt-sidebar/);
+  assert.match(CHATGPT_VIEWPORT_CSS, /accounts-profile-button/);
+  assert.match(CHATGPT_VIEWPORT_CSS, /open-sidebar-button/);
+  assert.match(CHATGPT_VIEWPORT_CSS, /close-sidebar-button/);
+});
 
 test("authentication diagnostics retain only origin and non-sensitive error metadata", () => {
   assert.equal(
@@ -49,6 +58,50 @@ test("only an explicit Cloudflare challenge on a ChatGPT backend response trigge
     statusCode: 403,
     url: "https://example.com/backend-api/subscriptions",
     responseHeaders: { "cf-mitigated": ["challenge"] },
+  }), false);
+});
+
+test("only nonessential ChatGPT sidebar background endpoints are blocked", () => {
+  for (const url of [
+    "https://chatgpt.com/backend-api/conversations?offset=0&limit=28&order=updated",
+    "https://chatgpt.com/backend-api/gizmos/snorlax/sidebar?owned_only=true&limit=20",
+    "https://chatgpt.com/backend-api/tasks",
+    "https://chatgpt.com/backend-api/task_suggestions?limit=4",
+  ]) {
+    assert.equal(shouldBlockChatGptBackgroundRequest(url), true, url);
+  }
+
+  for (const url of [
+    "https://chatgpt.com/backend-api/conversation/init",
+    "https://chatgpt.com/backend-api/f/conversation/prepare",
+    "https://chatgpt.com/backend-api/gizmos/bootstrap?limit=2",
+    "https://chatgpt.com/backend-api/apps/sources_dropdown",
+    "https://chatgpt.com/backend-api/files/download/file-123",
+    "https://chatgpt.com/api/auth/session",
+    "https://example.com/backend-api/conversations?offset=0",
+    "not a url",
+  ]) {
+    assert.equal(shouldBlockChatGptBackgroundRequest(url), false, url);
+  }
+});
+
+test("sidebar request blocking is limited to launcher-owned ChatGPT web contents", () => {
+  const fixture = Object.assign(Object.create(BrowserHost.prototype), {
+    view: { webContents: { id: 11 } },
+    turnTabs: new Map([
+      ["turn-1", { view: { webContents: { id: 22 } } }],
+    ]),
+  });
+  const historyRequest = {
+    url: "https://chatgpt.com/backend-api/conversations?offset=0&limit=28",
+  };
+
+  assert.equal(fixture.shouldBlockChatGptBackgroundRequest({ ...historyRequest, webContentsId: 11 }), true);
+  assert.equal(fixture.shouldBlockChatGptBackgroundRequest({ ...historyRequest, webContentsId: 22 }), true);
+  assert.equal(fixture.shouldBlockChatGptBackgroundRequest({ ...historyRequest, webContentsId: 33 }), false);
+  assert.equal(fixture.shouldBlockChatGptBackgroundRequest({
+    url: "https://chatgpt.com/backend-api/conversation/init",
+    webContentsId: 11,
   }), false);
 });
 
@@ -503,6 +556,77 @@ test("launcher authentication requires the Temporary Chat composer and complete 
   const result = await BrowserHost.prototype.probeAuthentication.call(fixture);
   assert.equal(result.authenticated, true);
   assert.equal(result.status, "ready");
+});
+
+test("background authentication observation does not request the server session", async () => {
+  let probeScript = "";
+  const fixture = {
+    state: { authenticated: false },
+    activeTraceId: null,
+    manualOperation: null,
+    authView: null,
+    view: {
+      webContents: {
+        isDestroyed: () => false,
+        getURL: () => "https://chatgpt.com/?temporary-chat=true",
+        executeJavaScript: async (script) => {
+          probeScript = script;
+          return {
+            composer: true,
+            authenticatedShell: true,
+            temporary: true,
+            sessionAuthenticated: false,
+            readyState: "complete",
+            url: "https://chatgpt.com/?temporary-chat=true",
+          };
+        },
+      },
+    },
+    setState(patch) { this.state = { ...this.state, ...patch }; },
+    snapshot() { return { ...this.state }; },
+    logger: { info() {} },
+  };
+
+  const result = await BrowserHost.prototype.probeAuthentication.call(fixture, { verifySession: false });
+
+  assert.doesNotMatch(probeScript, /\/api\/auth\/session/);
+  assert.equal(result.authenticated, true);
+  assert.equal(result.status, "ready");
+});
+
+test("strict authentication verification retains the server session probe", async () => {
+  let probeScript = "";
+  const fixture = {
+    state: { authenticated: false },
+    activeTraceId: null,
+    manualOperation: null,
+    authView: null,
+    view: {
+      webContents: {
+        isDestroyed: () => false,
+        getURL: () => "https://chatgpt.com/?temporary-chat=true",
+        executeJavaScript: async (script) => {
+          probeScript = script;
+          return {
+            composer: true,
+            authenticatedShell: true,
+            temporary: true,
+            sessionAuthenticated: true,
+            readyState: "complete",
+            url: "https://chatgpt.com/?temporary-chat=true",
+          };
+        },
+      },
+    },
+    setState(patch) { this.state = { ...this.state, ...patch }; },
+    snapshot() { return { ...this.state }; },
+    logger: { info() {} },
+  };
+
+  const result = await BrowserHost.prototype.probeAuthentication.call(fixture);
+
+  assert.match(probeScript, /fetch\("\/api\/auth\/session"/);
+  assert.equal(result.authenticated, true);
 });
 
 test("authentication windows stay inside the launcher-owned browser partition", () => {

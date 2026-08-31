@@ -36,6 +36,12 @@ const RETAINED_TURN_TAB_TTL_MS = 30 * 60 * 1000;
 const BROWSER_NAVIGATION_TIMEOUT_MS = 60_000;
 const CHATGPT_AUTH_SESSION_TIMEOUT_MS = 5_000;
 const CHATGPT_BACKEND_REQUEST_FILTER = { urls: [`${CHATGPT_ORIGIN}/backend-api/*`] };
+const BLOCKED_CHATGPT_BACKGROUND_PATHS = new Set([
+  "/backend-api/conversations",
+  "/backend-api/gizmos/snorlax/sidebar",
+  "/backend-api/tasks",
+  "/backend-api/task_suggestions",
+]);
 const ZOOM_FACTORS = [0.5, 0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 const SHELL_ZOOM_LEVEL_STEP = 0.5;
 const SHELL_ZOOM_LEVEL_LIMIT = 5;
@@ -73,6 +79,14 @@ const CHATGPT_VIEWPORT_CSS = `
     min-width: 0 !important;
     overflow-x: hidden !important;
   }
+
+  [data-codex-web-gpt-sidebar="true"],
+  [data-testid="accounts-profile-button"],
+  [data-testid="open-sidebar-button"],
+  [data-testid="close-sidebar-button"],
+  [data-testid="sidebar-button"] {
+    display: none !important;
+  }
 `;
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -88,6 +102,60 @@ function visibleElementScript(selector) {
       && style.visibility !== "hidden"
       && style.opacity !== "0";
   })`;
+}
+
+function ownedSurfaceScript(surfaceId) {
+  const encoded = JSON.stringify(surfaceId);
+  return `(() => {
+    Object.defineProperty(globalThis, "__CODEX_WEB_GPT_SURFACE_ID__", {
+      value: ${encoded}, configurable: true, enumerable: false, writable: false,
+    });
+    document.documentElement.dataset.codexWebGptSurface = ${encoded};
+
+    const sidebarAnchors = [
+      '[data-testid="accounts-profile-button"]',
+      '[data-testid="close-sidebar-button"]',
+      '#history',
+    ];
+    const markSidebar = () => {
+      const anchor = sidebarAnchors
+        .map(selector => document.querySelector(selector))
+        .find(Boolean);
+      if (!anchor) return;
+      let candidate = null;
+      for (let element = anchor; element && element !== document.body; element = element.parentElement) {
+        const bounds = element.getBoundingClientRect();
+        const maxSidebarWidth = Math.min(480, Math.max(220, innerWidth * 0.45));
+        if (bounds.left <= 24
+          && bounds.width >= 180
+          && bounds.width <= maxSidebarWidth
+          && bounds.height >= innerHeight * 0.6) {
+          candidate = element;
+        }
+      }
+      if (!candidate) return;
+      document.querySelectorAll('[data-codex-web-gpt-sidebar="true"]').forEach((element) => {
+        if (element !== candidate) element.removeAttribute('data-codex-web-gpt-sidebar');
+      });
+      candidate.setAttribute('data-codex-web-gpt-sidebar', 'true');
+    };
+    markSidebar();
+    if (!globalThis.__CODEX_WEB_GPT_CHROME_OBSERVER__) {
+      let pending = false;
+      const observer = new MutationObserver(() => {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(() => {
+          pending = false;
+          markSidebar();
+        });
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      Object.defineProperty(globalThis, "__CODEX_WEB_GPT_CHROME_OBSERVER__", {
+        value: observer, configurable: true, enumerable: false, writable: false,
+      });
+    }
+  })()`;
 }
 
 function normalizeBounds(bounds) {
@@ -158,6 +226,16 @@ function isChatGptBackendUrl(value) {
     return false;
   }
   return parsed.origin === CHATGPT_ORIGIN && parsed.pathname.startsWith("/backend-api/");
+}
+
+function shouldBlockChatGptBackgroundRequest(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  return parsed.origin === CHATGPT_ORIGIN && BLOCKED_CHATGPT_BACKGROUND_PATHS.has(parsed.pathname);
 }
 
 function responseHeaderIncludes(responseHeaders, name, expectedValue) {
@@ -275,6 +353,7 @@ class BrowserHost {
     this.view.webContents.setZoomFactor(this.state.zoomFactor);
     this.bindShellZoomShortcuts(this.window.webContents);
     this.bindShellZoomShortcuts(this.view.webContents);
+    this.bindChatGptRequestBlocking();
     this.bindChatGptBackendRecovery();
     this.bindWebContents();
     this.initializationReady = this.view.webContents.loadURL(IDLE_BROWSER_URL).then(async () => {
@@ -471,13 +550,7 @@ class BrowserHost {
       if (tab.url.startsWith(CHATGPT_ORIGIN)) tab.bootstrapReady = true;
       this.syncViewVisibility();
       void contents.insertCSS(CHATGPT_VIEWPORT_CSS).catch(() => {});
-      const encoded = JSON.stringify(tab.surfaceId);
-      void contents.executeJavaScript(`(() => {
-        Object.defineProperty(globalThis, "__CODEX_WEB_GPT_SURFACE_ID__", {
-          value: ${encoded}, configurable: true, enumerable: false, writable: false,
-        });
-        document.documentElement.dataset.codexWebGptSurface = ${encoded};
-      })()`, true).then(
+      void contents.executeJavaScript(ownedSurfaceScript(tab.surfaceId), true).then(
         () => this.publishState?.(this.snapshot()),
         (error) => {
           tab.status = "error";
@@ -571,7 +644,7 @@ class BrowserHost {
       this.setState({ url: contents.getURL(), loading: false });
       void this.applyViewportCss();
       void this.markOwnedSurface()
-        .then(() => this.probeAuthentication())
+        .then(() => this.probeAuthentication({ verifySession: false }))
         .catch((error) => {
           this.logger.error("browser.surface_mark_failed", {
             message: error instanceof Error ? error.message : String(error),
@@ -710,6 +783,20 @@ class BrowserHost {
     );
   }
 
+  bindChatGptRequestBlocking() {
+    this.view.webContents.session.webRequest.onBeforeRequest(
+      CHATGPT_BACKEND_REQUEST_FILTER,
+      (details, callback) => callback({ cancel: this.shouldBlockChatGptBackgroundRequest(details) }),
+    );
+  }
+
+  shouldBlockChatGptBackgroundRequest(details) {
+    if (!shouldBlockChatGptBackgroundRequest(details?.url)) return false;
+    const webContentsId = details?.webContentsId;
+    if (this.view?.webContents?.id === webContentsId) return true;
+    return [...this.turnTabs.values()].some(tab => tab.view?.webContents?.id === webContentsId);
+  }
+
   handleChatGptBackendResponse(details) {
     const contents = this.view?.webContents;
     if (!contents || contents.isDestroyed() || details?.webContentsId !== contents.id) return false;
@@ -772,7 +859,7 @@ class BrowserHost {
     if (!this.cloudflareChallengeRecoveryArmed) {
       throw new Error("ChatGPT security check is still blocking backend requests. Reload ChatGPT and retry.");
     }
-    await this.probeAuthentication();
+    await this.probeAuthentication({ verifySession: false });
     this.logger.info("browser.cloudflare_challenge_recovered", { url });
   }
 
@@ -1213,16 +1300,7 @@ class BrowserHost {
   }
 
   async markOwnedSurface() {
-    const surfaceId = JSON.stringify(this.surfaceId);
-    await this.view.webContents.executeJavaScript(`(() => {
-      Object.defineProperty(globalThis, "__CODEX_WEB_GPT_SURFACE_ID__", {
-        value: ${surfaceId},
-        configurable: true,
-        enumerable: false,
-        writable: false,
-      });
-      document.documentElement.dataset.codexWebGptSurface = ${surfaceId};
-    })()`, true);
+    await this.view.webContents.executeJavaScript(ownedSurfaceScript(this.surfaceId), true);
   }
 
   show() {
@@ -1236,7 +1314,7 @@ class BrowserHost {
     this.show();
     if (!this.selectedTurnTab() && this.view.webContents.getURL() === IDLE_BROWSER_URL) {
       await this.view.webContents.loadURL(TEMPORARY_CHAT_URL);
-      await this.probeAuthentication();
+      await this.probeAuthentication({ verifySession: false });
     }
     return this.snapshot();
   }
@@ -1527,7 +1605,7 @@ class BrowserHost {
     return tracked;
   }
 
-  async probeAuthentication() {
+  async probeAuthentication({ verifySession = true } = {}) {
     if (!this.view || this.view.webContents.isDestroyed()) return this.snapshot();
     let url = this.view.webContents.getURL();
     if (url === IDLE_BROWSER_URL) {
@@ -1542,22 +1620,7 @@ class BrowserHost {
       this.setState({ status: "signed-out", message: "Sign in to ChatGPT", authenticated: false, url });
       return this.snapshot();
     }
-    const probe = (contents) => contents.executeJavaScript(`(async () => {
-      const expectedUrl = new URL(${JSON.stringify(TEMPORARY_CHAT_URL)});
-      const readSurface = () => {
-        const composer = ${visibleElementScript(COMPOSER_SELECTOR)};
-        const actualUrl = new URL(location.href);
-        return {
-          url: actualUrl.href,
-          composer: Boolean(composer),
-          temporary: actualUrl.origin === expectedUrl.origin
-            && actualUrl.pathname === expectedUrl.pathname
-            && actualUrl.searchParams.get("temporary-chat") === "true",
-          readyState: document.readyState,
-        };
-      };
-      const initialSurface = readSurface();
-      let sessionAuthenticated = false;
+    const sessionProbe = verifySession ? `
       if (new URL(initialSurface.url).origin === expectedUrl.origin) {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), ${CHATGPT_AUTH_SESSION_TIMEOUT_MS});
@@ -1591,16 +1654,37 @@ class BrowserHost {
         } catch {}
         finally { clearTimeout(timeout); }
       }
+    ` : "";
+    const probe = (contents) => contents.executeJavaScript(`(async () => {
+      const expectedUrl = new URL(${JSON.stringify(TEMPORARY_CHAT_URL)});
+      const readSurface = () => {
+        const composer = ${visibleElementScript(COMPOSER_SELECTOR)};
+        const actualUrl = new URL(location.href);
+        return {
+          url: actualUrl.href,
+          composer: Boolean(composer),
+          authenticatedShell: Boolean(document.querySelector('[data-testid="accounts-profile-button"]')),
+          temporary: actualUrl.origin === expectedUrl.origin
+            && actualUrl.pathname === expectedUrl.pathname
+            && actualUrl.searchParams.get("temporary-chat") === "true",
+          readyState: document.readyState,
+        };
+      };
+      const initialSurface = readSurface();
+      let sessionAuthenticated = false;
+      ${sessionProbe}
       return { ...readSurface(), sessionAuthenticated };
     })()`, true).catch(() => ({
       url: "",
       composer: false,
+      authenticatedShell: false,
       temporary: false,
       sessionAuthenticated: false,
       readyState: "unknown",
     }));
     let result = await probe(this.view.webContents);
-    if (!(result.composer && result.temporary && result.sessionAuthenticated)
+    if (verifySession
+      && !(result.composer && result.temporary && result.sessionAuthenticated)
       && this.authView
       && !this.authView.webContents.isDestroyed()) {
       const authResult = await probe(this.authView.webContents);
@@ -1612,7 +1696,8 @@ class BrowserHost {
         result = await probe(this.view.webContents);
       }
     }
-    if (this.manualOperation === "ChatGPT login"
+    if (verifySession
+      && this.manualOperation === "ChatGPT login"
       && result.sessionAuthenticated
       && !result.temporary
       && !this.view.webContents.isDestroyed()) {
@@ -1620,7 +1705,10 @@ class BrowserHost {
       url = this.view.webContents.getURL();
       result = await probe(this.view.webContents);
     }
-    if (result.composer && result.temporary && result.sessionAuthenticated) {
+    const authenticated = result.composer
+      && result.temporary
+      && (verifySession ? result.sessionAuthenticated : (result.authenticatedShell || this.state.authenticated));
+    if (authenticated) {
       if (this.authView && !this.authView.webContents.isDestroyed()) {
         this.closeAuthView(this.authView, true, false);
       }
@@ -1830,5 +1918,6 @@ module.exports = {
   isTemporaryChatUrl,
   navigationErrorForLog,
   navigationOriginForLog,
+  shouldBlockChatGptBackgroundRequest,
   TEMPORARY_CHAT_URL,
 };
