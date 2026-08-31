@@ -9,7 +9,6 @@ function subscription(channel, listener) {
 contextBridge.exposeInMainWorld("codexWebLauncher", {
   snapshot: () => ipcRenderer.invoke("launcher:snapshot"),
   setLanguage: (language) => ipcRenderer.invoke("launcher:set-language", language),
-  openSocial: (target) => ipcRenderer.invoke("launcher:open-social", target),
   completeOnboarding: (language) => ipcRenderer.invoke("launcher:complete-onboarding", language),
   openExternal: (url) => ipcRenderer.invoke("launcher:open-external", url),
   setBrowserBounds: (bounds) => ipcRenderer.invoke("launcher:browser-bounds", bounds),

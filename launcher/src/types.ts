@@ -106,7 +106,6 @@ export interface LauncherSnapshot {
 export interface LauncherApi {
   snapshot(): Promise<LauncherSnapshot>;
   setLanguage(language: Language): Promise<LauncherState>;
-  openSocial(target: "github" | "x"): Promise<LauncherState>;
   completeOnboarding(language: Language): Promise<LauncherState>;
   openExternal(url: string): Promise<boolean>;
   setBrowserBounds(bounds: { x: number; y: number; width: number; height: number }): Promise<boolean>;

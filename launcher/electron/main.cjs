@@ -395,16 +395,8 @@ function registerIpc({ logger, stateStore }) {
   }));
 
   handle("launcher:set-language", (_event, language) => stateStore.update({ language: validateLanguage(language) }));
-  handle("launcher:open-social", async (_event, target) => {
-    const url = target === "github" ? GITHUB_URL : target === "x" ? X_URL : null;
-    if (!url) throw new Error("Unknown social target");
-    await openWebUrl(url);
-    const patch = target === "github" ? { githubOpened: true } : { xOpened: true };
-    return stateStore.update(patch);
-  });
   handle("launcher:complete-onboarding", (_event, language) => {
     const current = stateStore.read();
-    if (!current.githubOpened || !current.xOpened) throw new Error("Open the GitHub and X pages before continuing");
     if (current.autoStart) setAutostart(app, true);
     const next = stateStore.update({ language: validateLanguage(language), onboardingComplete: true });
     logger.info("launcher.onboarding_completed", { language: next.language });

@@ -139,36 +139,9 @@ function Onboarding({
   snapshot: LauncherSnapshot;
   updateState: (state: LauncherState) => void;
 }) {
-  const [stage, setStage] = useState<"language" | "support">(snapshot.state.language ? "support" : "language");
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(language);
   const [busy, setBusy] = useState(false);
   const localized = copyFor(selectedLanguage);
-  const isLanguage = stage === "language";
-
-  const chooseLanguage = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      updateState(await api!.setLanguage(selectedLanguage));
-      setStage("support");
-    } catch (cause) {
-      setError(messageOf(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const openSocial = async (target: "github" | "x") => {
-    setBusy(true);
-    setError(null);
-    try {
-      updateState(await api!.openSocial(target));
-    } catch (cause) {
-      setError(messageOf(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const finish = async () => {
     setBusy(true);
@@ -205,68 +178,42 @@ function Onboarding({
           className="welcome-stage"
           exit={{ opacity: 0, y: -8 }}
           initial={{ opacity: 0, y: 8 }}
-          key={stage}
+          key="language"
           transition={PANEL_TRANSITION}
         >
-          <span className="welcome-kicker">{isLanguage ? "01" : "02"}</span>
-          <h1>{isLanguage ? localized.chooseLanguage : localized.supportTitle}</h1>
-          <p>{isLanguage ? localized.chooseLanguageHint : localized.supportBody}</p>
+          <span className="welcome-kicker">01</span>
+          <h1>{localized.chooseLanguage}</h1>
+          <p>{localized.chooseLanguageHint}</p>
 
-          {isLanguage ? (
-            <div className="welcome-options" role="radiogroup" aria-label={localized.chooseLanguage}>
-              <WelcomeOption
-                active={selectedLanguage === "en"}
-                detail="English"
-                label="English"
-                marker="EN"
-                onClick={() => setSelectedLanguage("en")}
-              />
-              <WelcomeOption
-                active={selectedLanguage === "zh-CN"}
-                detail="简体中文"
-                label="简体中文"
-                marker="简"
-                onClick={() => setSelectedLanguage("zh-CN")}
-              />
-            </div>
-          ) : (
-            <div className="welcome-options">
-              <WelcomeAction
-                complete={snapshot.state.githubOpened}
-                disabled={busy}
-                icon="github"
-                label={snapshot.state.githubOpened ? localized.starred : localized.star}
-                onClick={() => openSocial("github")}
-              />
-              <WelcomeAction
-                complete={snapshot.state.xOpened}
-                disabled={busy}
-                icon="x"
-                label={snapshot.state.xOpened ? localized.followed : localized.follow}
-                onClick={() => openSocial("x")}
-              />
-            </div>
-          )}
+          <div className="welcome-options" role="radiogroup" aria-label={localized.chooseLanguage}>
+            <WelcomeOption
+              active={selectedLanguage === "en"}
+              detail="English"
+              label="English"
+              marker="EN"
+              onClick={() => setSelectedLanguage("en")}
+            />
+            <WelcomeOption
+              active={selectedLanguage === "zh-CN"}
+              detail="简体中文"
+              label="简体中文"
+              marker="简"
+              onClick={() => setSelectedLanguage("zh-CN")}
+            />
+          </div>
         </m.section>
       </AnimatePresence>
 
       <footer className="welcome-footer">
-        <div>
-          {!isLanguage ? (
-            <button className="text-button" onClick={() => setStage("language")} type="button">
-              {localized.previous}
-            </button>
-          ) : null}
-        </div>
-        <div className="welcome-progress" aria-label={`${isLanguage ? 1 : 2} / 2`}>
-          <span className={!isLanguage ? "is-complete" : "is-active"} />
-          <span className={!isLanguage ? "is-active" : ""} />
+        <div />
+        <div className="welcome-progress" aria-label="1 / 1">
+          <span className="is-active" />
         </div>
         <PrimaryButton
-          disabled={busy || (!isLanguage && (!snapshot.state.githubOpened || !snapshot.state.xOpened))}
-          onClick={isLanguage ? chooseLanguage : finish}
+          disabled={busy}
+          onClick={finish}
         >
-          {isLanguage ? localized.continue : localized.finishWelcome}
+          {localized.finishWelcome}
         </PrimaryButton>
       </footer>
     </m.main>
