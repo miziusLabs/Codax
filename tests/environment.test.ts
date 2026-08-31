@@ -167,6 +167,72 @@ describe("trusted current Codex environment envelope", () => {
       .toThrow("missing cwd");
   });
 
+  test("accepts an automation context item that embeds the trusted environment", () => {
+    const request = currentWire();
+    const body = request._rawBody as { input: Array<Record<string, unknown>> };
+    body.input = [{
+      type: "message",
+      id: "msg_automation_context",
+      role: "user",
+      content: [
+        { type: "input_text", text: "<recommended_plugins>Available plugins</recommended_plugins>" },
+        { type: "input_text", text: "# AGENTS.md instructions\n\nProject instructions" },
+        { type: "input_text", text: environmentXml },
+      ],
+      internal_chat_message_metadata_passthrough: {
+        turn_id: "turn_current",
+        content_item_kinds: [
+          "plugins.recommendations",
+          "agents_md.instructions",
+          "environments.environment_context",
+        ],
+      },
+    }, {
+      type: "function_call_output",
+      name: "automation_update",
+      output: "Automation instructions",
+    }];
+
+    expect(extractChatGptTurnEnvironment(request)).toEqual({
+      cwd: root,
+      roots: [root],
+      writableRoots: [root],
+      sandboxPolicy: { type: "dangerFullAccess" },
+      tools: [],
+    });
+  });
+
+  test("does not trust user-authored environment XML without the native environment content kind", () => {
+    const request = currentWire();
+    const body = request._rawBody as { input: Array<Record<string, unknown>> };
+    body.input = [{
+      type: "message",
+      id: "msg_user_xml",
+      role: "user",
+      content: [{ type: "input_text", text: environmentXml }],
+      internal_chat_message_metadata_passthrough: { turn_id: "turn_current" },
+    }];
+
+    expect(() => extractChatGptTurnEnvironment(request)).toThrow("missing cwd");
+  });
+
+  test("does not trust an embedded environment content item from another turn", () => {
+    const request = currentWire();
+    const body = request._rawBody as { input: Array<Record<string, unknown>> };
+    body.input = [{
+      type: "message",
+      id: "msg_other_turn_context",
+      role: "user",
+      content: [{ type: "input_text", text: environmentXml }],
+      internal_chat_message_metadata_passthrough: {
+        turn_id: "turn_other",
+        content_item_kinds: ["environments.environment_context"],
+      },
+    }];
+
+    expect(() => extractChatGptTurnEnvironment(request)).toThrow("missing cwd");
+  });
+
   test("recovers a canonical current-turn environment when a skill message follows the prompt", () => {
     const request = currentWire();
     const body = request._rawBody as { input: Array<Record<string, unknown>> };

@@ -335,6 +335,38 @@ function canonicalMetadataEnvironmentBeforeUser(
   return undefined;
 }
 
+function canonicalMetadataEnvironmentInUser(
+  input: unknown[],
+  userIndex: number,
+  metadata: Record<string, unknown> | undefined,
+): string | undefined {
+  if (userIndex < 0 || !metadata) return undefined;
+  const metadataTurnId = typeof metadata.turn_id === "string" ? metadata.turn_id.trim() : "";
+  const metadataSandbox = sandboxTypeFromMetadata(canonicalSandboxMetadata(metadata));
+  if (!metadataTurnId || !metadataSandbox) return undefined;
+
+  const user = record(input[userIndex]);
+  if (user?.type !== "message" || user.role !== "user" || typeof user.id !== "string" || !user.id) return undefined;
+  if (itemTurnId(user) !== metadataTurnId) return undefined;
+
+  const passthrough = record(user.internal_chat_message_metadata_passthrough);
+  const contentItemKinds = passthrough?.content_item_kinds;
+  if (!Array.isArray(contentItemKinds) || !contentItemKinds.includes("environments.environment_context")) {
+    return undefined;
+  }
+
+  const content = Array.isArray(user.content) ? user.content : [];
+  for (const part of content) {
+    const text = record(part)?.text;
+    if (typeof text !== "string") continue;
+    const trimmed = text.trim();
+    if (!/^<environment_context>[\s\S]*<\/environment_context>$/.test(trimmed)) continue;
+    if (!environmentMatchesCanonicalMetadata(trimmed, metadata, false)) continue;
+    return trimmed;
+  }
+  return undefined;
+}
+
 function hasAssistantOutputBetween(input: unknown[], startIndex: number, endIndex: number): boolean {
   for (let index = startIndex; index < endIndex; index += 1) {
     const item = record(input[index]);
@@ -365,6 +397,13 @@ function rawEnvironmentText(parsed: CodexParsedRequest): string | undefined {
 
   const current = canonicalMetadataEnvironmentBeforeUser(input, activeUserIndex, clientTurnMetadata(parsed));
   if (current) return current;
+
+  // Automations can start without a human user message. In that shape Codex emits one
+  // server-owned context item containing recommendations/instructions plus the environment, then
+  // submits the automation tool output directly. Authenticate the environment through the native
+  // content-kind marker and canonical turn/workspace/sandbox metadata before accepting it.
+  const embeddedCurrent = canonicalMetadataEnvironmentInUser(input, activeUserIndex, clientTurnMetadata(parsed));
+  if (embeddedCurrent) return embeddedCurrent;
 
   // A skill invocation appends another server-owned user item after the real instruction. Recover
   // the earlier current-turn environment/prompt pair only through canonical metadata, and bind all
