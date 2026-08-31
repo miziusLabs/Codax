@@ -102,7 +102,7 @@ test("one browser conversation spans native turns and rotates only at compaction
   expect(chatGptConversationKey(nextTurn, "provider")).toBe(chatGptConversationKey(before, "provider"));
   expect(chatGptConversationKey(afterCompact, "provider")).not.toBe(chatGptConversationKey(before, "provider"));
   const otherModel = structuredClone(before);
-  otherModel.modelId = "chatgpt-web/pro";
+  otherModel.modelId = "chatgpt-web/gpt-5.6-sol";
   expect(chatGptConversationKey(otherModel, "provider")).not.toBe(chatGptConversationKey(before, "provider"));
   const otherEffort = structuredClone(before);
   otherEffort.options.reasoning = "medium";

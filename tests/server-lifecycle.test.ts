@@ -333,7 +333,7 @@ test("a Codex retry after tab cancellation receives terminal HTTP 400 without a 
   const config = defaultConfig("browser-only");
   const turnId = "turn_cancelled_replay";
   const body = {
-    model: "chatgpt-web/high",
+    model: "chatgpt-web/gpt-5.6-sol",
     stream: true,
     client_metadata: {
       "x-codex-turn-metadata": JSON.stringify({
@@ -395,7 +395,7 @@ test("a restart recovery turn without a new user instruction fails terminally in
   const previousTurnId = "turn_before_codex_restart";
   const recoveryTurnId = "turn_after_codex_restart";
   const body = {
-    model: "chatgpt-web/high",
+    model: "chatgpt-web/gpt-5.6-sol",
     stream: true,
     client_metadata: {
       "x-codex-turn-metadata": JSON.stringify({

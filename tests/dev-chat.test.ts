@@ -78,7 +78,7 @@ test("remote outer harness owns a turn through the live broker protocol", async 
 test("named DEV state and deterministic context filler persist independently", () => {
   const root = scratch("cgw-dev-store");
   const store = new DevChatStore(join(root, "chats"));
-  const opened = store.loadOrCreate("compaction-lab", "chatgpt-web/high", root);
+  const opened = store.loadOrCreate("compaction-lab", "chatgpt-web/gpt-5.6-sol", root);
   expect(opened.created).toBe(true);
   const filler = createDevContextFiller(3_000);
   expect(filler.tokens).toBeGreaterThanOrEqual(3_000);
@@ -112,7 +112,7 @@ test("coherent DEV MCP payloads are bounded, deterministic, and distinct", () =>
 });
 
 test("new DEV chats default to the cheapest account-supported browser model", () => {
-  expect(defaultDevChatModel({ ...defaultConfig("full"), solAvailable: true })).toBe("chatgpt-web/light");
+  expect(defaultDevChatModel({ ...defaultConfig("full"), solAvailable: true })).toBe("chatgpt-web/gpt-5.6-sol");
   expect(defaultDevChatModel({ ...defaultConfig("full"), solAvailable: false })).toBe("chatgpt-web/luna");
 });
 
@@ -136,7 +136,7 @@ test("DEV compaction follows retained Sol model headroom and Bigger Context stay
   });
   const store = new DevChatStore(join(root, "chats"));
   const normal = new DevChatDriver(config, store, factory, root);
-  const normalState = normal.open("normal-window", "chatgpt-web/high").state;
+  const normalState = normal.open("normal-window", "chatgpt-web/gpt-5.6-sol").state;
   expect(normal.status(normalState)).toMatchObject({
     autoCompactTokenLimit: 244_800,
     contextWindow: 272_000,
@@ -144,7 +144,7 @@ test("DEV compaction follows retained Sol model headroom and Bigger Context stay
 
   const biggerConfig = { ...config, experimentalBiggerContext: true };
   const bigger = new DevChatDriver(biggerConfig, store, factory, root, { biggerContext: true });
-  const biggerState = bigger.open("bigger-window", "chatgpt-web/high").state;
+  const biggerState = bigger.open("bigger-window", "chatgpt-web/gpt-5.6-sol").state;
   const biggerStatus = bigger.status(biggerState);
   expect(biggerStatus).toMatchObject({
     autoCompactTokenLimit: 244_800,
@@ -181,7 +181,7 @@ test("browser-only DEV driver runs real turns without advertising simulated tool
   });
   const driver = new DevChatDriver(config, new DevChatStore(join(root, "chats")), factory, root);
   try {
-    const state = driver.open("browser-only", "chatgpt-web/extra-high").state;
+    const state = driver.open("browser-only", "chatgpt-web/gpt-5.6-sol").state;
     await expect(driver.send(state, "Exercise Extra High without MCP credentials."))
       .resolves.toMatchObject({ text: "Browser-only DEV turn completed.", toolCalls: 0 });
   } finally {
@@ -345,7 +345,7 @@ test("synthetic fill crosses the retained Sol threshold and triggers the real co
   });
   const store = new DevChatStore(join(root, "chats"));
   const driver = new DevChatDriver(config, store, factory, root);
-  const state = driver.open("auto-compact", "chatgpt-web/light").state;
+  const state = driver.open("auto-compact", "chatgpt-web/gpt-5.6-sol").state;
   driver.fill(state, 240_000);
   expect(driver.status(state).inputTokens).toBeGreaterThanOrEqual(244_800);
   const events: string[] = [];

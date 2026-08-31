@@ -6,11 +6,7 @@ import { estimateTokens } from "../lib/token-estimate";
 
 export const DEV_CHAT_MODELS = [
   "chatgpt-web/luna",
-  "chatgpt-web/light",
-  "chatgpt-web/medium",
-  "chatgpt-web/high",
-  "chatgpt-web/extra-high",
-  "chatgpt-web/pro",
+  "chatgpt-web/gpt-5.6-sol",
 ] as const;
 
 export type DevChatModel = typeof DEV_CHAT_MODELS[number];

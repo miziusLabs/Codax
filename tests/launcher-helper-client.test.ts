@@ -280,7 +280,7 @@ test("structured helper errors preserve the ChatGPT adapter failure contract", a
     internal.pending.set("rate-limit-123", {
       turn: {
         traceId: "rate-limit-123",
-        modelId: "chatgpt-web/medium",
+        modelId: "chatgpt-web/gpt-5.6-sol",
         capabilities: { localToolsEnabled: false, solAvailable: true, proAvailable: false },
         prepare: async () => ({ text: "inspect", images: [], release() {} }),
         onTextDelta() {},

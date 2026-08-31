@@ -7,7 +7,7 @@ import type { CodexProviderConfig } from "../src/types";
 import { extractChatGptTurnIdentity } from "../src/adapters/chatgpt-web/environment";
 import { chatGptCompactionSourceExecutionKey, chatGptTurnExecutionKey } from "../src/adapters/chatgpt-web/turn-execution";
 
-const model = "chatgpt-web/high";
+const model = "chatgpt-web/gpt-5.6-sol";
 const summary = "The repository was inspected. Continue by implementing the bounded Web context contract.";
 
 function compactionAdapterFactory(seenProviders: CodexProviderConfig[] = []) {
@@ -67,7 +67,8 @@ test("compacts a Pro task with Pro effort", async () => {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      model: "chatgpt-web/pro",
+      model: "chatgpt-web/gpt-5.6-sol",
+      reasoning: { effort: "max" },
       input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Inspect" }] }],
     }),
   }), config, () => ({
@@ -255,13 +256,18 @@ test("Luna rejects a remote-v2 compaction trigger before opening another browser
 
 test("rejects Pro-only routed models before opening a browser when the account has no Pro access", async () => {
   for (const [routedModel, label] of [
-    ["chatgpt-web/extra-high", "Extra High"],
-    ["chatgpt-web/pro", "Pro"],
+    ["xhigh", "Extra High"],
+    ["max", "GPT-5.6 Sol"],
   ] as const) {
     const response = await responseRequest(new Request("http://127.0.0.1:17841/v1/responses", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model: routedModel, input: "test", stream: false }),
+      body: JSON.stringify({
+        model: "chatgpt-web/gpt-5.6-sol",
+        reasoning: { effort: routedModel },
+        input: "test",
+        stream: false,
+      }),
     }), defaultConfig("browser-only"));
 
     expect(response.status).toBe(400);

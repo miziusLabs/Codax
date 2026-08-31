@@ -6,7 +6,7 @@ export type ChatGptWebBackendModel =
   | typeof CHATGPT_WEB_BACKEND_MODEL
   | typeof CHATGPT_WEB_LUNA_BACKEND_MODEL;
 
-export type ChatGptWebCodexEffort = "low" | "medium" | "high" | "xhigh" | "ultra";
+export type ChatGptWebCodexEffort = "low" | "medium" | "high" | "xhigh" | "max";
 export type ChatGptWebAdapterEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
 /** Actual ChatGPT Chat model windows. Browser transport/task budgets are tracked separately. */
@@ -207,14 +207,13 @@ export const CHATGPT_WEB_LUNA_MODEL_ROUTE: ChatGptWebModelRoute = {
 };
 
 /**
- * The selected Codex model is the authoritative ChatGPT browser mode. Codex's signed desktop UI
- * always renders an Effort row, so every routed model advertises exactly one immutable protocol
- * effort. Pro uses Codex's `ultra` protocol value but binds explicitly to ChatGPT Pro (`max`) at
- * the adapter boundary.
+ * The selected Codex reasoning effort is the authoritative ChatGPT browser mode. A single Sol
+ * model advertises every available effort, with `max` binding to ChatGPT Pro. `ultra` is never
+ * registered or routed.
  */
 export const CHATGPT_WEB_MODEL_ROUTES: readonly ChatGptWebModelRoute[] = [
   {
-    slug: "chatgpt-web/light",
+    slug: "chatgpt-web/gpt-5.6-sol",
     displayName: "GPT-5.6 Sol",
     description: "ChatGPT Web Instant through the native Codex harness.",
     backendModel: CHATGPT_WEB_BACKEND_MODEL,
@@ -223,7 +222,7 @@ export const CHATGPT_WEB_MODEL_ROUTES: readonly ChatGptWebModelRoute[] = [
     requiresPro: false,
   },
   {
-    slug: "chatgpt-web/medium",
+    slug: "chatgpt-web/gpt-5.6-sol",
     displayName: "GPT-5.6 Sol",
     description: "ChatGPT Web Medium through the native Codex harness.",
     backendModel: CHATGPT_WEB_BACKEND_MODEL,
@@ -232,7 +231,7 @@ export const CHATGPT_WEB_MODEL_ROUTES: readonly ChatGptWebModelRoute[] = [
     requiresPro: false,
   },
   {
-    slug: "chatgpt-web/high",
+    slug: "chatgpt-web/gpt-5.6-sol",
     displayName: "GPT-5.6 Sol",
     description: "ChatGPT Web High through the native Codex harness.",
     backendModel: CHATGPT_WEB_BACKEND_MODEL,
@@ -241,7 +240,7 @@ export const CHATGPT_WEB_MODEL_ROUTES: readonly ChatGptWebModelRoute[] = [
     requiresPro: false,
   },
   {
-    slug: "chatgpt-web/extra-high",
+    slug: "chatgpt-web/gpt-5.6-sol",
     displayName: "ChatGPT Web — Extra High",
     description: "Account-gated ChatGPT Web Extra High through the native Codex harness.",
     backendModel: CHATGPT_WEB_BACKEND_MODEL,
@@ -250,19 +249,20 @@ export const CHATGPT_WEB_MODEL_ROUTES: readonly ChatGptWebModelRoute[] = [
     requiresPro: true,
   },
   {
-    slug: "chatgpt-web/pro",
-    displayName: "ChatGPT Web — Pro",
+    slug: "chatgpt-web/gpt-5.6-sol",
+    displayName: "GPT-5.6 Sol",
     description: "Account-gated ChatGPT Pro through the native Codex harness.",
     backendModel: CHATGPT_WEB_BACKEND_MODEL,
-    codexEffort: "ultra",
+    codexEffort: "max",
     adapterEffort: "max",
     requiresPro: true,
   },
 ];
 
-const routesBySlug = new Map(
-  [CHATGPT_WEB_LUNA_MODEL_ROUTE, ...CHATGPT_WEB_MODEL_ROUTES].map(route => [route.slug, route]),
-);
+const routesBySlug = new Map<string, readonly ChatGptWebModelRoute[]>([
+  [CHATGPT_WEB_LUNA_MODEL_ROUTE.slug, [CHATGPT_WEB_LUNA_MODEL_ROUTE]],
+  [CHATGPT_WEB_MODEL_ROUTES[0]!.slug, CHATGPT_WEB_MODEL_ROUTES],
+]);
 
 export function isChatGptWebModelSlug(modelId: string): boolean {
   return modelId.startsWith(CHATGPT_WEB_MODEL_PREFIX);
@@ -272,26 +272,29 @@ export function availableChatGptWebModelRoutes(
   capabilities: ChatGptWebAccountCapabilities,
 ): readonly ChatGptWebModelRoute[] {
   if (!capabilities.solAvailable) return [CHATGPT_WEB_LUNA_MODEL_ROUTE];
-  return capabilities.proAvailable
-    ? CHATGPT_WEB_MODEL_ROUTES
-    : CHATGPT_WEB_MODEL_ROUTES.filter(route => !route.requiresPro);
+  return [CHATGPT_WEB_MODEL_ROUTES[0]!];
 }
 
 export function requireChatGptWebModelRoute(
   modelId: string,
   capabilities: ChatGptWebAccountCapabilities,
+  effort?: string,
 ): ChatGptWebModelRoute {
-  const route = routesBySlug.get(modelId);
-  if (!route) throw new Error(`ChatGPT web model is not enabled: ${modelId}`);
-  if (route === CHATGPT_WEB_LUNA_MODEL_ROUTE) {
+  const candidates = routesBySlug.get(modelId);
+  if (!candidates) throw new Error(`ChatGPT web model is not enabled: ${modelId}`);
+  if (candidates[0] === CHATGPT_WEB_LUNA_MODEL_ROUTE) {
+    const route = CHATGPT_WEB_LUNA_MODEL_ROUTE;
     if (capabilities.solAvailable) {
       throw new Error(`${route.displayName} is only available for Luna-only accounts`);
     }
     return route;
   }
   if (!capabilities.solAvailable) {
-    throw new Error(`${route.displayName} is not available for this Luna-only account`);
+    throw new Error(`${candidates[0]!.displayName} is not available for this Luna-only account`);
   }
+  const normalizedEffort = effort === "max" ? "max" : effort;
+  const route = candidates.find(candidate => candidate.codexEffort === normalizedEffort)
+    ?? candidates[0]!;
   if (route.requiresPro && !capabilities.proAvailable) {
     throw new Error(`${route.displayName} is not available for this account`);
   }

@@ -2,6 +2,8 @@ import type { AppConfig } from "./config";
 import type { CodexModelContextOverride } from "./codex-integration";
 import {
   availableChatGptWebModelRoutes,
+  CHATGPT_WEB_LUNA_MODEL_ROUTE,
+  CHATGPT_WEB_MODEL_ROUTES,
   CHATGPT_WEB_MODEL_PREFIX,
   resolveChatGptWebModelContextLimits,
   type ChatGptWebModelRoute,
@@ -45,16 +47,7 @@ function routedModelPriority(
   config: AppConfig,
 ): number | undefined {
   const priority = modelPriority(template);
-  if (priority === undefined
-    || config.subagentProtocol !== "compatibility-v1"
-    || route.slug !== "chatgpt-web/light") return priority;
-  if (priority === Number.MAX_SAFE_INTEGER) {
-    throw new Error("Native Codex model template priority cannot reserve the Compatibility V1 roster");
-  }
-  // Codex V1 exposes at most five model overrides. Keep the native Sol row plus the four useful
-  // delegated Web efforts (Medium, High, Extra High, Pro); Instant remains a selectable root model
-  // but does not displace Pro from spawn_agent's bounded registry.
-  return priority + 1;
+  return priority;
 }
 
 function nativeTemplateCandidate(value: unknown, requireTools: boolean): value is JsonObject {
@@ -96,9 +89,10 @@ function routedSubagentVersion(template: JsonObject, config: AppConfig): string 
 
 export function buildChatGptWebModel(
   templateValue: unknown,
-  route: ChatGptWebModelRoute,
+  routes: readonly ChatGptWebModelRoute[],
   config: AppConfig,
 ): JsonObject {
+  const route = routes[0]!;
   const template = object(templateValue, "native Codex model template");
   const templateSlug = slug(template);
   if (!templateSlug || templateSlug.startsWith(CHATGPT_WEB_MODEL_PREFIX)) {
@@ -132,7 +126,20 @@ export function buildChatGptWebModel(
     tool_mode: null,
     upgrade: null,
     default_reasoning_level: route.codexEffort,
-    supported_reasoning_levels: [reasoningLevel(template, route.codexEffort, route.displayName)],
+    supported_reasoning_levels: routes
+      .filter(candidate => !candidate.requiresPro || config.proAvailable)
+      .map(candidate => reasoningLevel(template, candidate.codexEffort,
+        candidate === CHATGPT_WEB_LUNA_MODEL_ROUTE
+          ? candidate.displayName
+          : candidate.codexEffort === "low"
+            ? "Light"
+            : candidate.codexEffort === "medium"
+              ? "Medium"
+              : candidate.codexEffort === "high"
+                ? "High"
+                : candidate.codexEffort === "xhigh"
+                  ? "Extra High"
+                  : "Max")),
     context_window: limits.contextWindow,
     max_context_window: limits.contextWindow,
     effective_context_window_percent: limits.effectiveContextWindowPercent,
@@ -188,8 +195,9 @@ export function augmentNativeModelCatalog(
       }
     }
   }
-  const webModels = availableChatGptWebModelRoutes(config)
-    .map(route => buildChatGptWebModel(template, route, config));
+  const webModels = config.solAvailable
+    ? [buildChatGptWebModel(template, CHATGPT_WEB_MODEL_ROUTES, config)]
+    : availableChatGptWebModelRoutes(config).map(route => buildChatGptWebModel(template, [route], config));
   return {
     ...structuredClone(catalog),
     models: [...nativeModels, ...webModels],

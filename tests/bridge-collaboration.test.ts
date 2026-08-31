@@ -26,7 +26,7 @@ describe("MultiAgent V2 plaintext collaboration contract", () => {
   for (const name of ["spawn_agent", "send_message", "followup_task"]) {
     test(`marks ${name} arguments as explicit plaintext in JSON and SSE`, async () => {
       const events = collaborationEvents(name);
-      const response = buildResponseJSON(events, "chatgpt-web/pro", {
+      const response = buildResponseJSON(events, "chatgpt-web/gpt-5.6-sol", {
         toolNsMap: collaborationMap,
       }) as { output: Array<Record<string, unknown>> };
       expect(response.output.at(-1)).toMatchObject({
@@ -38,7 +38,7 @@ describe("MultiAgent V2 plaintext collaboration contract", () => {
 
       const body = await new Response(bridgeToResponsesSSE(
         streamed(events),
-        "chatgpt-web/pro",
+        "chatgpt-web/gpt-5.6-sol",
         collaborationMap,
       )).text();
       const items = body
@@ -59,7 +59,7 @@ describe("MultiAgent V2 plaintext collaboration contract", () => {
   }
 
   test("does not mark non-message collaboration calls", () => {
-    const response = buildResponseJSON(collaborationEvents("wait_agent"), "chatgpt-web/pro", {
+    const response = buildResponseJSON(collaborationEvents("wait_agent"), "chatgpt-web/gpt-5.6-sol", {
       toolNsMap: collaborationMap,
     }) as { output: Array<Record<string, unknown>> };
     expect(response.output.at(-1)).not.toHaveProperty("encrypted_function_args");

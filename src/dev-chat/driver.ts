@@ -356,7 +356,7 @@ function usageOf(response: ResponsesEnvelope): DevChatUsage {
 }
 
 export function defaultDevChatModel(config: AppConfig): DevChatModel {
-  return config.solAvailable ? "chatgpt-web/light" : "chatgpt-web/luna";
+  return config.solAvailable ? "chatgpt-web/gpt-5.6-sol" : "chatgpt-web/luna";
 }
 
 export function prepareWorkingTreeBrowserHelper(): string | undefined {

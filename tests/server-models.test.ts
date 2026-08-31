@@ -3,7 +3,7 @@ import { defaultConfig } from "../src/config";
 import { CHATGPT_WEB_MODEL_ROUTES, resolveChatGptWebModelContextLimits } from "../src/chatgpt-web-models";
 import { modelsRequest } from "../src/server";
 
-test("proxies official /models auth and query, then appends the fixed ChatGPT Web models", async () => {
+test("proxies official /models auth and query, then appends the ChatGPT Web model", async () => {
   const request = new Request("http://127.0.0.1:17841/v1/models?client_version=1.2.3", {
     headers: { authorization: "Bearer codex-oauth-token", "if-none-match": "native-etag" },
   });
@@ -49,27 +49,22 @@ test("proxies official /models auth and query, then appends the fixed ChatGPT We
   };
   expect(body.models.map(model => model.slug)).toEqual([
     "gpt-5.6-sol",
-    "chatgpt-web/light",
-    "chatgpt-web/medium",
-    "chatgpt-web/high",
-    "chatgpt-web/extra-high",
-    "chatgpt-web/pro",
+    "chatgpt-web/gpt-5.6-sol",
   ]);
   expect(body.models[0]!.context_window).toBe(300_000);
   expect(body.models[0]!.max_context_window).toBe(371_851);
   expect(body.models[0]!.auto_compact_token_limit).toBe(270_000);
   expect(body.models[0]!.multi_agent_version).toBe("v2");
-  for (const [index, model] of body.models.slice(1).entries()) {
-    const route = CHATGPT_WEB_MODEL_ROUTES[index]!;
-    const limits = resolveChatGptWebModelContextLimits(route.backendModel, route.adapterEffort, config);
-    expect(model.context_window).toBe(limits.contextWindow);
-    expect(model.max_context_window).toBe(limits.contextWindow);
-    expect(model.effective_context_window_percent).toBe(limits.effectiveContextWindowPercent);
-    expect(model.auto_compact_token_limit).toBe(limits.autoCompactTokenLimit);
-    expect(model.supported_in_api).toBe(true);
-    expect(model.priority).toBe(1);
-    expect(model.multi_agent_version).toBe("v2");
-  }
+  const model = body.models[1]!;
+  const route = CHATGPT_WEB_MODEL_ROUTES[0]!;
+  const limits = resolveChatGptWebModelContextLimits(route.backendModel, route.adapterEffort, config);
+  expect(model.context_window).toBe(limits.contextWindow);
+  expect(model.max_context_window).toBe(limits.contextWindow);
+  expect(model.effective_context_window_percent).toBe(limits.effectiveContextWindowPercent);
+  expect(model.auto_compact_token_limit).toBe(limits.autoCompactTokenLimit);
+  expect(model.supported_in_api).toBe(true);
+  expect(model.priority).toBe(1);
+  expect(model.multi_agent_version).toBe("v2");
 });
 
 test("Luna-only account exposes no paid ChatGPT Web routes", async () => {
@@ -119,7 +114,7 @@ test("ChatGPT-only native catalog rows do not turn model discovery into a 502", 
   const body = await response.json() as { models: Array<{ slug: string; supported_in_api?: boolean }> };
   expect(body.models[0]).toMatchObject({ slug: "gpt-chatgpt-only", supported_in_api: false });
   expect(body.models.filter(model => model.slug.startsWith("chatgpt-web/")))
-    .toHaveLength(3);
+    .toHaveLength(1);
   expect(body.models.filter(model => model.slug.startsWith("chatgpt-web/"))
     .every(model => model.supported_in_api === true)).toBe(true);
 });

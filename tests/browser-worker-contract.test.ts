@@ -134,7 +134,7 @@ test("browser turns run concurrently up to the five-tab limit", async () => {
   }) as ChatGptBrowserWorker;
   const browserTurn = (traceId: string) => ({
     traceId,
-    modelId: "chatgpt-web/high",
+    modelId: "chatgpt-web/gpt-5.6-sol",
     capabilities: { localToolsEnabled: false, solAvailable: true, proAvailable: true },
     prepare: async () => ({ text: traceId, images: [], release() {} }),
     onTextDelta() {},

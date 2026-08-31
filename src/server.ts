@@ -281,7 +281,7 @@ export interface ResponseRequestOptions {
 }
 
 export function routeChatGptWebRequest(parsed: CodexParsedRequest, config: AppConfig): ChatGptWebModelRoute {
-  const route = requireChatGptWebModelRoute(parsed.modelId, config);
+  const route = requireChatGptWebModelRoute(parsed.modelId, config, parsed.options.reasoning);
   parsed.modelId = route.backendModel;
   parsed.options.reasoning = route.adapterEffort;
   return route;
