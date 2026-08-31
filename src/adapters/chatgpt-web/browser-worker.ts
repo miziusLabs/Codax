@@ -770,6 +770,7 @@ export function chatGptTurnIsComplete(state: {
   running: boolean;
   currentText: string;
   currentHtml?: string;
+  revisionKey?: string;
   completionActionVisible: boolean;
 }): boolean {
   return state.responsePresent
@@ -834,7 +835,7 @@ export function chatGptReboundTurnIdentity(
 }
 
 export class ChatGptCompletionTracker {
-  private candidate?: { signature: string; since: number };
+  private candidate?: { text: string; revision: string; since: number };
 
   constructor(private readonly stableMs = CHATGPT_COMPLETION_SETTLE_MS) {}
 
@@ -843,9 +844,9 @@ export class ChatGptCompletionTracker {
       this.candidate = undefined;
       return false;
     }
-    const signature = `${state.currentText}\0${state.currentHtml ?? state.currentText}`;
-    if (this.candidate?.signature !== signature) {
-      this.candidate = { signature, since: now };
+    const revision = state.revisionKey ?? state.currentHtml ?? state.currentText;
+    if (this.candidate?.text !== state.currentText || this.candidate.revision !== revision) {
+      this.candidate = { text: state.currentText, revision, since: now };
       return false;
     }
     return now - this.candidate.since >= this.stableMs;
@@ -948,7 +949,7 @@ export interface ChatGptVisibleTraceEvent {
 interface ChatGptResponseDomSnapshot {
   responsePresent: boolean;
   visibleText: string;
-  fullHtml: string;
+  revisionKey: string;
   markdownSegments: ChatGptMarkdownSegment[];
   completionActionVisible: boolean;
   stoppedThinkingVisible: boolean;
@@ -965,7 +966,7 @@ interface ChatGptResponseDomCache {
 const absentResponseDomSnapshot = (): ChatGptResponseDomSnapshot => ({
   responsePresent: false,
   visibleText: "",
-  fullHtml: "",
+  revisionKey: "absent",
   markdownSegments: [],
   completionActionVisible: false,
   stoppedThinkingVisible: false,
@@ -2383,7 +2384,7 @@ export class ChatGptBrowserWorker {
         responsePresent: snapshot.responsePresent,
         running,
         currentText: snapshot.visibleText,
-        currentHtml: snapshot.fullHtml,
+        revisionKey: snapshot.revisionKey,
         completionActionVisible: snapshot.completionActionVisible,
       })) {
         const actual = snapshot.visibleText.trim();
@@ -2786,6 +2787,28 @@ export class ChatGptBrowserWorker {
         ...(segment.sourceEnd !== undefined ? { sourceEnd: segment.sourceEnd } : {}),
         streamable: index < segments.length - 1,
       }));
+      // Completion stability must notice markup-only hydration (citations/links) without copying
+      // the complete answer HTML across CDP a second time. The segment HTML is already required by
+      // the Markdown stream, so fold those existing strings into a compact dual-hash signature.
+      let markdownHashA = 0x811c9dc5;
+      let markdownHashB = 0x1505;
+      let markdownChars = 0;
+      const hashMarkdownValue = (value: string) => {
+        markdownChars += value.length + 1;
+        for (let index = 0; index < value.length; index += 1) {
+          const code = value.charCodeAt(index);
+          markdownHashA = Math.imul(markdownHashA ^ code, 0x01000193);
+          markdownHashB = Math.imul(markdownHashB, 33) ^ code;
+        }
+        markdownHashA = Math.imul(markdownHashA, 0x01000193);
+        markdownHashB = Math.imul(markdownHashB, 33);
+      };
+      markdownSegments.forEach(segment => {
+        hashMarkdownValue(segment.key);
+        hashMarkdownValue(segment.tag ?? "");
+        hashMarkdownValue(segment.html);
+      });
+      const markdownRevisionKey = `${markdownSegments.length}:${markdownChars}:${markdownHashA >>> 0}:${markdownHashB >>> 0}`;
       const rendered = renderedRoots.at(-1);
       const completionAction = rendered
         ? [...root.querySelectorAll<HTMLElement>(options.completionActionSelector)]
@@ -2912,7 +2935,7 @@ export class ChatGptBrowserWorker {
         snapshot: {
           responsePresent: true,
           visibleText: renderedRoots.map(candidate => candidate.innerText.trim()).filter(Boolean).join("\n\n"),
-          fullHtml: renderedRoots.map(candidate => candidate.innerHTML).join(""),
+          revisionKey: markdownRevisionKey,
           markdownSegments,
           completionActionVisible: completionAction !== undefined,
           stoppedThinkingVisible,
@@ -2930,6 +2953,11 @@ export class ChatGptBrowserWorker {
       }
       return absentResponseDomSnapshot();
     }
+    if (observed.snapshot) {
+      observed.snapshot.traceBlocks = observed.snapshot.traceBlocks
+        .map(stripChatGptTraceControlSuffix)
+        .filter(block => block.text.length > 0 && !isChatGptTraceControl(block));
+    }
     const snapshot = observed.snapshot ?? cache?.snapshot ?? absentResponseDomSnapshot();
     if (observed.snapshot && cache) {
       cache.key = observed.key;
@@ -2938,9 +2966,6 @@ export class ChatGptBrowserWorker {
     } else if (!observed.snapshot && cache?.snapshot) {
       cache.cacheHits = (cache.cacheHits ?? 0) + 1;
     }
-    snapshot.traceBlocks = snapshot.traceBlocks
-      .map(stripChatGptTraceControlSuffix)
-      .filter(block => block.text.length > 0 && !isChatGptTraceControl(block));
     return snapshot;
   }
 
@@ -3565,7 +3590,7 @@ export class ChatGptBrowserWorker {
             responsePresent: snapshot.responsePresent,
             running,
             currentText: snapshot.visibleText,
-            currentHtml: snapshot.fullHtml,
+            revisionKey: snapshot.revisionKey,
             completionActionVisible: snapshot.completionActionVisible,
           })) {
             if (snapshot.visibleText === "api_tool unavailable") {

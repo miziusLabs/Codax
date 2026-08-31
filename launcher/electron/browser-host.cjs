@@ -223,6 +223,8 @@ class BrowserHost {
     this.runBrowserHelperOperation = runBrowserHelperOperation;
     this.verifyConnectorWithBrowserHelper = verifyConnectorWithBrowserHelper;
     this.surfaceId = randomBytes(24).toString("base64url");
+    this.descriptorCreatedAt = new Date().toISOString();
+    this.lastDescriptorPayload = null;
     this.visible = false;
     this.surfaceActive = true;
     this.turnTabs = new Map();
@@ -1793,9 +1795,12 @@ class BrowserHost {
       partition: this.partition,
       idleUrl: IDLE_BROWSER_URL,
       surfaceId: this.surfaceId,
-      createdAt: new Date().toISOString(),
+      createdAt: this.descriptorCreatedAt,
     };
-    writePrivateFileAtomic(this.descriptorPath, `${JSON.stringify(descriptor, null, 2)}\n`);
+    const payload = `${JSON.stringify(descriptor, null, 2)}\n`;
+    if (payload === this.lastDescriptorPayload) return;
+    writePrivateFileAtomic(this.descriptorPath, payload);
+    this.lastDescriptorPayload = payload;
   }
 
   async persistSession() {

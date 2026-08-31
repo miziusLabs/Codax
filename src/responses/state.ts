@@ -24,8 +24,12 @@ interface StoredResponseState {
 const states = new Map<string, StoredResponseState>();
 let storedResponseBytes = 0;
 
-/** The ONLY size computation: approximate entry weight from its items payload. */
-function measuredEntry(entry: Omit<StoredResponseState, "sizeBytes">): StoredResponseState {
+/** Full-entry fallback measurement. Continuation chains can reuse a proven inherited size. */
+function measuredEntry(
+  entry: Omit<StoredResponseState, "sizeBytes">,
+  knownSizeBytes?: number,
+): StoredResponseState {
+  if (knownSizeBytes !== undefined) return { ...entry, sizeBytes: knownSizeBytes };
   let sizeBytes = 0;
   try {
     sizeBytes = JSON.stringify(entry.items).length;
@@ -36,9 +40,13 @@ function measuredEntry(entry: Omit<StoredResponseState, "sizeBytes">): StoredRes
 }
 
 /** The ONLY insertion point: keeps the byte counter consistent on replacement. */
-function setEntry(id: string, entry: Omit<StoredResponseState, "sizeBytes">): void {
+function setEntry(
+  id: string,
+  entry: Omit<StoredResponseState, "sizeBytes">,
+  knownSizeBytes?: number,
+): void {
   deleteEntry(id);
-  const measured = measuredEntry(entry);
+  const measured = measuredEntry(entry, knownSizeBytes);
   storedResponseBytes += measured.sizeBytes ?? 0;
   states.set(id, measured);
 }
@@ -56,6 +64,7 @@ function deleteEntry(id: string): void {
 // upstream. Consumers use the prefix length to bind trusted history and rolling checkpoints to the
 // exact replayed portion of this request.
 const replayedInputPrefixLengths = new WeakMap<object, number>();
+const replayedInputSizes = new WeakMap<object, number>();
 let loaded = false;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingPersistPath: string | null = null;
@@ -188,6 +197,10 @@ export function expandPreviousResponseInput(body: unknown): unknown {
     input: [...previous.items, ...inputItems(request.input)],
   };
   replayedInputPrefixLengths.set(expanded, previous.items.length);
+  const previousSizeBytes = previous.sizeBytes;
+  if (previousSizeBytes !== undefined && previousSizeBytes > 0) {
+    replayedInputSizes.set(expanded, previousSizeBytes);
+  }
   return expanded;
 }
 
@@ -221,10 +234,32 @@ export function rememberResponseState(
       || (details as { reason?: unknown }).reason !== "max_output_tokens") return;
   } else if (response.status !== undefined && response.status !== "completed") return;
   ensureLoaded();
+  const input = inputItems(request.input);
+  const replayedPrefixLength = replayedInputPrefixLengths.get(requestBody) ?? 0;
+  const replayedSizeBytes = replayedInputSizes.get(requestBody);
+  let knownSizeBytes: number | undefined;
+  if (replayedSizeBytes !== undefined && replayedPrefixLength > 0 && replayedPrefixLength <= input.length) {
+    try {
+      const appendedSize = JSON.stringify([
+        ...input.slice(replayedPrefixLength),
+        ...response.output,
+      ]).length;
+      // Both sizes include their own array brackets. Joining two non-empty JSON arrays removes
+      // those four brackets and adds one comma, i.e. combined = left + right - 1. Empty suffixes
+      // preserve the inherited size exactly.
+      knownSizeBytes = appendedSize === 2
+        ? replayedSizeBytes
+        : replayedSizeBytes === 2
+          ? appendedSize
+          : replayedSizeBytes + appendedSize - 1;
+    } catch {
+      // Fall back to measuring the complete entry for unusual unserializable payloads.
+    }
+  }
   setEntry(response.id, {
     createdAt: now(),
-    items: [...inputItems(request.input), ...response.output],
-  });
+    items: [...input, ...response.output],
+  }, knownSizeBytes);
   pruneResponses();
   schedulePersist();
 }
