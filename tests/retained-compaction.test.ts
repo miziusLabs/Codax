@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BrowserTurn } from "../src/adapters/chatgpt-web/browser-worker";
 import { ChatGptBrowserWorker } from "../src/adapters/chatgpt-web/browser-worker";
-import { chatGptRetainedConversationUnavailableError } from "../src/adapters/chatgpt-web/adapter-error";
 import {
   MAX_COMPACTION_HANDOFF_TIMEOUT_MS,
   requestRetainedCompactionHandoff,
@@ -561,7 +560,7 @@ test("retained conversation release waits for physical settlement", async () => 
   expect(releases).toBe(1);
 });
 
-test("adapter compact returns only the same-agent MCP handoff and retires the old epoch", async () => {
+test("adapter compact rebuilds canonical Codex history after the source response completed", async () => {
   const root = mkdtempSync(join(tmpdir(), "cgw-adapter-retained-compact-"));
   const provider: CodexProviderConfig = {
     adapter: "chatgpt-web",
@@ -598,18 +597,15 @@ test("adapter compact returns only the same-agent MCP handoff and retires the ol
   await chatGptTurnSessions.find(sourceKey)!.browserOutcome;
 
   (worker as unknown as { run: (turn: BrowserTurn) => Promise<string> }).run = async turn => {
-    const prepared = await turn.prepareResume!();
-    const binding = controlBinding(prepared.text);
-    expect(turn.nativeConnector).toBeTrue();
+    const prepared = await turn.prepare();
+    expect(turn.compaction).toBeTrue();
+    expect(turn.conversationKey).toBeUndefined();
+    expect(turn.requireRetainedConversation).toBeUndefined();
+    expect(turn.nativeConnector).toBeUndefined();
     expect(turn.capabilities.localToolsEnabled).toBeFalse();
+    expect(prepared.text).toContain("Original task");
     prepared.release();
-    await callTurnBroker(provider.chatgptWeb!.brokerSocketPath!, {
-      method: "submit_compaction_handoff",
-      token: binding.token,
-      handoffId: binding.handoffId,
-      summary: "Adapter retained checkpoint",
-    });
-    return "Checkpoint submitted through MCP";
+    return "Adapter canonical checkpoint";
   };
   const compact = structuredClone(sourceRequest);
   compact._compactionRequest = true;
@@ -639,7 +635,7 @@ test("adapter compact returns only the same-agent MCP handoff and retires the ol
       .filter((event): event is Extract<AdapterEvent, { type: "text_delta" }> => event.type === "text_delta")
       .map(event => event.text)
       .join("");
-    expect(text).toContain("Adapter retained checkpoint");
+    expect(text).toContain("Adapter canonical checkpoint");
     expect(text).toContain("CODEX_LATEST_USER_PROMPT_JSON");
     expect(events.at(-1)).toMatchObject({ type: "done", stopReason: "stop", endTurn: true });
     expect(chatGptTurnSessions.find(sourceKey)).toBeUndefined();
@@ -652,7 +648,7 @@ test("adapter compact returns only the same-agent MCP handoff and retires the ol
   }
 });
 
-test("a compact HTTP observer can reconnect without sending a second retained-chat message", async () => {
+test("a compact HTTP observer can reconnect without starting a second canonical browser message", async () => {
   const root = mkdtempSync(join(tmpdir(), "cgw-compact-reconnect-"));
   const provider: CodexProviderConfig = {
     adapter: "chatgpt-web",
@@ -695,18 +691,14 @@ test("a compact HTTP observer can reconnect without sending a second retained-ch
   const finish = new Promise<void>(resolve => { finishMessage = resolve; });
   (worker as unknown as { run: (turn: BrowserTurn) => Promise<string> }).run = async turn => {
     browserMessages += 1;
-    const prepared = await turn.prepareResume!();
-    const binding = controlBinding(prepared.text);
+    const prepared = await turn.prepare();
+    expect(turn.compaction).toBeTrue();
+    expect(turn.conversationKey).toBeUndefined();
+    expect(turn.requireRetainedConversation).toBeUndefined();
     prepared.release();
     messageStarted();
     await finish;
-    await callTurnBroker(provider.chatgptWeb!.brokerSocketPath!, {
-      method: "submit_compaction_handoff",
-      token: binding.token,
-      handoffId: binding.handoffId,
-      summary: "Reconnect-safe checkpoint",
-    });
-    return "Checkpoint submitted through MCP";
+    return "Reconnect-safe checkpoint";
   };
   const compact = structuredClone(sourceRequest);
   compact._compactionRequest = true;
@@ -798,7 +790,7 @@ test("structured compact rebuilds canonical context when its retained source is 
   }
 });
 
-test("structured compact rebuilds canonical context when its retained browser disappeared", async () => {
+test("structured compact rebuilds canonical context directly after a completed source", async () => {
   const root = mkdtempSync(join(tmpdir(), "cgw-stale-retained-compact-"));
   const provider: CodexProviderConfig = {
     adapter: "chatgpt-web",
@@ -832,7 +824,8 @@ test("structured compact rebuilds canonical context when its retained browser di
   let browserStarts = 0;
   (worker as unknown as { run: (turn: BrowserTurn) => Promise<string> }).run = async turn => {
     browserStarts += 1;
-    if (turn.requireRetainedConversation) throw chatGptRetainedConversationUnavailableError();
+    expect(turn.requireRetainedConversation).toBeUndefined();
+    expect(turn.conversationKey).toBeUndefined();
     const prepared = await turn.prepare();
     expect(prepared.text).toContain("Original task");
     prepared.release();
@@ -845,7 +838,7 @@ test("structured compact rebuilds canonical context when its retained browser di
       { headers: new Headers() },
       event => events.push(event),
     );
-    expect(browserStarts).toBe(2);
+    expect(browserStarts).toBe(1);
     expect(events.some(event => event.type === "text_delta"
       && event.text.includes("Fallback checkpoint after retained browser loss"))).toBeTrue();
     expect(events.at(-1)).toMatchObject({ type: "done", stopReason: "stop", endTurn: true });

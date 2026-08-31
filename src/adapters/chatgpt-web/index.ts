@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { defaultBrokerEndpoint, expandUserPath, resolveBrokerEndpoint } from "../../config";
-import { releaseLauncherRetainedConversation } from "../../launcher-browser-host";
 import { namespacedToolName, type AdapterEvent, type CodexContentPart, type CodexParsedRequest, type CodexProviderConfig, type CodexToolResultMessage, type CodexUsage } from "../../types";
 import type { ProviderAdapter } from "../base";
 import { parseDataUrl } from "../image";
@@ -23,14 +22,10 @@ import { ChatGptExternalTurnProgress } from "./turn-progress";
 import {
   canonicalizeCompactionHandoff,
   existingStructuredCompactionRun,
-  requestRetainedCompactionHandoff,
   runStructuredCompactionOnce,
   settleActiveCompactionSource,
 } from "./compaction-handoff";
-import {
-  chatGptConversationKey,
-  retainedConversationResumeRequest,
-} from "./conversation-key";
+import { chatGptConversationKey } from "./conversation-key";
 
 function brokerSocketPath(provider: CodexProviderConfig): string {
   const configured = provider.chatgptWeb?.brokerSocketPath?.trim();
@@ -293,15 +288,6 @@ export function createChatGptWebAdapter(
       && retainedLauncherDescriptor
       ? chatGptConversationKey(checkpointInput.parsed, executionNamespace)
       : undefined;
-    const resumeInput = conversationKey
-      ? retainedConversationResumeRequest(checkpointInput.parsed)
-      : undefined;
-    const retainConversation = conversationKey !== undefined;
-    const releaseRetainedConversation = conversationKey && retainedLauncherDescriptor
-      ? async () => {
-        await releaseLauncherRetainedConversation(retainedLauncherDescriptor, conversationKey);
-      }
-      : undefined;
     const compileOptionsFor = (input: CodexParsedRequest) => {
       const experimentalMultipartParts = experimentalBiggerContext
         ? resolveBiggerContextMultipartParts(input, turnCapabilities)
@@ -416,8 +402,6 @@ export function createChatGptWebAdapter(
       reasoning: parsed.options.reasoning,
       capabilities: turnCapabilities,
       prepare: () => prepareWith(checkpointInput.parsed),
-      ...(resumeInput ? { prepareResume: () => prepareWith(resumeInput) } : {}),
-      ...(retainConversation ? { retainConversation: true, conversationKey } : {}),
       abortSignal: browserAbort.signal,
       ...(parsed._compactionRequest ? { compaction: true } : {}),
       ...submissionLifecycle,
@@ -446,7 +430,6 @@ export function createChatGptWebAdapter(
       text,
       usageInput: checkpointInput.parsed,
       ...(conversationKey ? { conversationKey } : {}),
-      ...(releaseRetainedConversation ? { releaseRetainedConversation } : {}),
       retireCapability: async () => {
         if (activeToken) await broker.revoke(activeToken);
       },
@@ -541,60 +524,29 @@ export function createChatGptWebAdapter(
             sharedSummary = runStructuredCompactionOnce(
               compactionExecutionKey,
               async () => {
-                const retainedKey = source?.conversationKey();
-                if (!source || !retainedKey) {
-                  return runFreshCompactionFallback("source_unavailable_before_handoff");
-                }
-                try {
-                  let rawSummary: string;
-                  if (source.isActive() && source.runtime.mode === "tools") {
-                    rawSummary = await settleActiveCompactionSource(parsed, source, structuredBroker!)
-                      ?? await requestRetainedCompactionHandoff(
-                        worker,
-                        parsed,
-                        source,
-                        structuredBroker!,
-                        configuredCapabilities,
-                        handoffTraceId,
-                        undefined,
-                        timeoutMs,
-                      );
-                  } else {
-                    if (source.isActive()) {
-                      const outcome = await source.browserOutcome;
-                      if (outcome.type === "error") throw outcome.error;
-                      await source.physicalSettlement;
-                    }
-                    rawSummary = await requestRetainedCompactionHandoff(
-                      worker,
+                const sourceKey = source?.conversationKey();
+                if (source?.isActive() && source.runtime.mode === "tools") {
+                  try {
+                    const rawSummary = await settleActiveCompactionSource(
                       parsed,
                       source,
                       structuredBroker!,
-                      configuredCapabilities,
-                      handoffTraceId,
-                      undefined,
-                      timeoutMs,
+                    );
+                    if (rawSummary !== undefined) {
+                      const summary = canonicalizeCompactionHandoff(parsed, rawSummary);
+                      if (sourceKey) await chatGptTurnSessions.retireConversationAndWait(sourceKey);
+                      return summary;
+                    }
+                  } catch (error) {
+                    console.warn(
+                      `[chatgpt-web] active compaction handoff unavailable; rebuilding canonical context: ${error instanceof Error ? error.message : String(error)}`,
                     );
                   }
-                  const summary = canonicalizeCompactionHandoff(parsed, rawSummary);
-                  await chatGptTurnSessions.retireConversationAndWait(retainedKey);
-                  return summary;
-                } catch (error) {
-                  let handoffError = error instanceof Error ? error : new Error(String(error));
-                  try {
-                    await chatGptTurnSessions.retireConversationAndWait(retainedKey);
-                  } catch (retirementError) {
-                    handoffError = new AggregateError(
-                      [handoffError, retirementError instanceof Error ? retirementError : new Error(String(retirementError))],
-                      "Structured compaction failed and its retained conversation could not be retired",
-                    );
-                  }
-                  if (handoffError instanceof ChatGptWebAdapterError
-                    && handoffError.code === "compaction_source_unavailable") {
-                    return runFreshCompactionFallback("source_disappeared_before_handoff");
-                  }
-                  throw handoffError;
                 }
+                if (sourceKey) await chatGptTurnSessions.retireConversationAndWait(sourceKey);
+                return runFreshCompactionFallback(
+                  source ? "source_completed_before_handoff" : "source_unavailable_before_handoff",
+                );
               },
             );
           }

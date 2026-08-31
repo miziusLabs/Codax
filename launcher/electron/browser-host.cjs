@@ -1395,8 +1395,8 @@ class BrowserHost {
     status,
     hideAfterTurn,
     message,
-    retain = false,
-    connectorBound = false,
+    _retain = false,
+    _connectorBound = false,
   ) {
     const tab = [...this.turnTabs.values()].find((candidate) => candidate.traceId === traceId);
     if (!tab) {
@@ -1421,22 +1421,9 @@ class BrowserHost {
     if (status === "completed") {
       this.logger.info("browser.tab_completed", { tabId: tab.id, traceId });
     }
-    if (status === "completed"
-      && retain
-      && tab.conversationKey
-      && (!tab.connectorIdentity || connectorBound)) {
-      tab.connectorBound = connectorBound === true;
-      tab.lastHeartbeatAt = Date.now();
-      if (hideAfterTurn && !this.activeTraceId) this.hide();
-      this.logger.info("browser.tab_retained", { tabId: tab.id, traceId });
-      this.publishState?.(this.snapshot());
-      this.writeDescriptor();
-      return { cancelledByUser };
-    }
-    // A browser tab represents an active Codex turn, not durable task history. Retaining terminal
-    // tabs leaked one slot per response/compaction until the bounded tab limit made later
-    // turns fail. The result already lives in Codex; release the browser document on every
-    // terminal path while leaving other concurrently running tabs untouched.
+    // Codex is the canonical conversation store. A browser tab represents only the currently
+    // executing ChatGPT response, so release its renderer on every terminal path. Legacy callers
+    // may still send retain metadata, but completed browser documents are intentionally ephemeral.
     this.removeTurnTab(tab, false);
     if (hideAfterTurn && !this.activeTraceId) this.hide();
     this.logger.info("browser.tab_released", { tabId: tab.id, traceId, status: tab.status });

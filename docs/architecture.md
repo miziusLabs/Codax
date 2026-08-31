@@ -76,13 +76,12 @@ and development connectors installed without renaming, refreshing, or deleting e
 
 ## Browser lifecycle
 
-The desktop launcher owns one persistent Electron partition and up to five task-bound browser
-tabs. Each task/model/effort/compaction epoch owns one exact `WebContentsView` lease; sequential
-native messages reuse that surface, while each message receives a fresh turn-bound MCP token and
-keeps all of its MCP tool rounds inside one ChatGPT response. Compaction asks the same retained Web
-agent for a one-shot structured checkpoint, waits for the response and physical helper cleanup,
-then closes the old surface. The next epoch gets a new Temporary Chat. Model messages never copy
-state between tabs. Tabs share only the local login
+The desktop launcher owns one persistent Electron partition and up to five concurrently active
+task-bound browser tabs. Each ChatGPT response owns one `WebContentsView` lease and receives a fresh
+turn-bound MCP token. All MCP tool rounds for that response stay inside the same browser document,
+but the document is destroyed as soon as the response reaches a terminal state. Sequential native
+messages therefore open fresh Temporary Chats and rebuild their context from canonical Codex
+history instead of relying on browser-local conversation state. Tabs share only the local login
 partition and keep independent documents and lifecycles. Closing a running tab destroys its page
 and terminates that browser turn. A sixth concurrent turn fails explicitly; the cap avoids excessive
 parallel traffic that could trigger account abuse controls.
@@ -108,10 +107,10 @@ Top-level `model_context_window` raises only the proxied native rows' advertised
 Codex to apply its own configured context override without clamping. Routed ChatGPT Web models
 retain their measured adapter-owned limits.
 
-In Full mode, routed compaction v1/v2 uses the exact retained source agent and a one-shot MCP control
-capability that accepts only the bound checkpoint; it cannot claim or invoke the ordinary Codex tool
-environment. A missing retained source falls back to a dedicated read-only Temporary Chat built from
-canonical Codex history; an invalid or ambiguous handoff still fails explicitly. Browser-only mode
+In Full mode, routed compaction v1/v2 can finish an already-active source response with a one-shot MCP
+control capability that accepts only the bound checkpoint; it cannot claim or invoke the ordinary
+Codex tool environment. Once the source response has already finished, compaction uses a dedicated
+read-only Temporary Chat built from canonical Codex history. Browser-only mode
 uses the same read-only summarization path, then returns the native replacement-history shape expected
 by Codex. A prompt-level checkpoint marker is translated into a visible Codex trace item;
 every later tool action in the same turn continues to present the current turn capability. Visible

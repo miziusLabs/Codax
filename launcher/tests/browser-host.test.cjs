@@ -1768,8 +1768,9 @@ test("ending one browser turn does not stop another running tab", async () => {
   assert.equal(fixture.activeTraceId, active.traceId);
 });
 
-test("a completed keyed turn is retained for thirty minutes and preserves its acknowledgement", async () => {
+test("a completed keyed turn is released even when a legacy caller requests retention", async () => {
   const throttling = [];
+  let closed = false;
   const tab = {
     id: "tab-retained",
     surfaceId: "surface-retained",
@@ -1783,6 +1784,7 @@ test("a completed keyed turn is retained for thirty minutes and preserves its ac
     view: { webContents: {
       isDestroyed: () => false,
       setBackgroundThrottling: (enabled) => throttling.push(enabled),
+      close: () => { closed = true; },
     } },
   };
   const fixture = Object.assign(Object.create(BrowserHost.prototype), {
@@ -1790,6 +1792,7 @@ test("a completed keyed turn is retained for thirty minutes and preserves its ac
     closedTurnOwners: new Map(),
     userCancelledTurnOwners: new Map(),
     selectedTabId: tab.id,
+    window: { contentView: { removeChildView() {} } },
     syncViewVisibility() {},
     writeDescriptor() {},
     publishState() {},
@@ -1810,15 +1813,11 @@ test("a completed keyed turn is retained for thirty minutes and preserves its ac
   );
 
   assert.deepEqual(result, { cancelledByUser: false });
-  assert.equal(fixture.turnTabs.get(tab.id), tab);
+  assert.equal(fixture.turnTabs.has(tab.id), false);
   assert.equal(tab.status, "ready");
-  assert.equal(tab.connectorBound, true);
-  assert.equal(Number.isFinite(tab.lastHeartbeatAt), true);
+  assert.equal(tab.connectorBound, false);
+  assert.equal(closed, true);
   assert.deepEqual(throttling, [true]);
-
-  const retainedAt = tab.lastHeartbeatAt;
-  BrowserHost.prototype.reapExpiredTurnTabs.call(fixture, retainedAt + (30 * 60 * 1000) - 1);
-  assert.equal(fixture.turnTabs.has(tab.id), true);
 });
 
 test("a retained browser tab expires at thirty minutes", () => {
