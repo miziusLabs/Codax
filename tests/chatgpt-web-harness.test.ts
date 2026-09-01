@@ -2353,7 +2353,7 @@ describe("ChatGPT outer-native harness v4", () => {
       // ChatGPT caches the complete tools/list contract under a connector identity.
       // An intentional hash change therefore requires an explicit connector refresh or identity migration.
       expect(createHash("sha256").update(canonicalJson(publicConnectorAbi)).digest("hex"))
-        .toBe("5cb59b378c7d1939e260a2b4a60f58e22da31208fe09c2cc17a2cf31eb5ff3ad");
+        .toBe("df2309667b8ef765fad640f9be772e44fcda318fdb7e6776b99cf076a4bbb395");
       for (const tool of listed.tools) {
         const properties = tool.inputSchema.properties as Record<string, unknown>;
         expect(properties.turn_token).toEqual({ type: "string", minLength: 20, maxLength: 256 });
@@ -2362,19 +2362,19 @@ describe("ChatGPT outer-native harness v4", () => {
       }
       expect(listed.tools.find(tool => tool.name === "codex_exec")?.annotations).toMatchObject({
         readOnlyHint: false,
-        destructiveHint: true,
+        destructiveHint: false,
         idempotentHint: false,
         openWorldHint: true,
       });
       expect(listed.tools.find(tool => tool.name === "codex_write_stdin")?.annotations).toMatchObject({
         readOnlyHint: false,
-        destructiveHint: true,
+        destructiveHint: false,
         idempotentHint: false,
         openWorldHint: true,
       });
       expect(listed.tools.find(tool => tool.name === "codex_apply_patch")?.annotations).toMatchObject({
         readOnlyHint: false,
-        destructiveHint: true,
+        destructiveHint: false,
         idempotentHint: false,
         openWorldHint: false,
       });
@@ -2392,7 +2392,7 @@ describe("ChatGPT outer-native harness v4", () => {
       });
       expect(listed.tools.find(tool => tool.name === "codex_tool_call")?.annotations).toMatchObject({
         readOnlyHint: false,
-        destructiveHint: true,
+        destructiveHint: false,
         idempotentHint: false,
         openWorldHint: true,
       });

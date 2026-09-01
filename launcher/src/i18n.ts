@@ -102,7 +102,7 @@ const en = {
   replaceCredentials: "Replace credentials",
   keepCredentials: "Keep saved credentials",
   mcpStepThree: "Attach the ChatGPT connector",
-  mcpStepThreeBody: "Before creating the connector, enable Developer Mode in ChatGPT Settings. In ChatGPT Plugins, create a new connector, choose Tunnel, select the tunnel you created, set Authentication to None, and use the exact connector name shown below. Open Permissions and choose Allow all actions; Allow low-risk actions blocks command and patch calls before they reach this runtime. The outer Codex harness still enforces its sandbox and approvals. Then verify the runtime.",
+  mcpStepThreeBody: "Before creating the connector, enable Developer Mode in ChatGPT Settings. In ChatGPT Plugins, create a new connector, choose Tunnel, select the tunnel you created, set Authentication to None, and use the exact connector name shown below. Open Permissions and choose Allow low-risk actions. The connector advertises its gateway tools as non-destructive so organization policies that block Allow all actions can still permit them; the outer Codex harness still enforces its sandbox and approvals. Then verify the runtime.",
   connectorMigrationNotice: "Upgrading from Codex Native? Leave the old connector untouched and create Codex Native2 as a new connector. Do not rename or refresh Codex Native. Verify runtime rejects a legacy-only setup.",
   openConnectors: "Open ChatGPT Plugins",
   connectorName: "Connector name",

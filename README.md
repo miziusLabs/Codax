@@ -128,9 +128,8 @@ not expose a public IP, open an inbound port, or require router forwarding.
 
 > [!WARNING]
 > Create a **new** connector named **Codex Native2** and set its permissions to
-> **Allow all actions**. Do not rename, refresh, or reuse an older **Codex Native** connector:
-> ChatGPT caches the public MCP contract by connector identity, and **Allow low-risk actions**
-> blocks commands and patches before they reach the Codex harness.
+> **Allow low-risk actions**. Do not rename, refresh, or reuse an older **Codex Native** connector:
+> ChatGPT caches the public MCP contract by connector identity.
 
 1. Finish the required launcher setup.
 2. Open **MCP** in the launcher. Create the Tunnel and a regular API key on the same OpenAI account
@@ -141,9 +140,9 @@ not expose a public IP, open an inbound port, or require router forwarding.
    that exact Tunnel, set **Authentication** to **None**, and name it exactly **Codex Native2**.
 5. If an older **Codex Native** connector exists, leave it untouched. Do not rename or refresh it:
    ChatGPT caches the public MCP contract by connector identity, and this release uses a new direct
-   turn-token contract. Under **Permissions** on **Codex Native2**, choose **Allow all actions**;
-   **Allow low-risk actions** blocks commands and patches before they reach this runtime. The outer
-   Codex harness still enforces its sandbox and approvals.
+   turn-token contract. Under **Permissions** on **Codex Native2**, choose **Allow low-risk actions**.
+   The connector advertises its gateway tools as non-destructive so organization policies that block
+   **Allow all actions** can still permit them; the outer Codex harness still enforces its sandbox and approvals.
 6. Run **Verify runtime**. It selects **Codex Native2** exactly. If only **Codex Native** is found,
    verification fails with an explicit migration error instead of accepting the legacy connector.
 

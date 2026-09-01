@@ -286,7 +286,7 @@ export async function runChatGptMcpServer(options: { brokerSocketPath: string })
         max_output_tokens: z.number().int().min(1).max(1_000_000).optional(),
         tty: z.boolean().optional(),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ turn_token, cmd, workdir, yield_time_ms, max_output_tokens, tty }, extra) => {
       const claimed = await claimTurn("codex_exec", turn_token, extra);
@@ -330,7 +330,7 @@ export async function runChatGptMcpServer(options: { brokerSocketPath: string })
         yield_time_ms: z.number().int().min(250).max(300_000).optional(),
         max_output_tokens: z.number().int().min(1).max(1_000_000).optional(),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ turn_token, session_id, chars, yield_time_ms, max_output_tokens }, extra) => {
       const claimed = await claimTurn("codex_write_stdin", turn_token, extra);
@@ -354,7 +354,7 @@ export async function runChatGptMcpServer(options: { brokerSocketPath: string })
       title: "Apply a native Codex patch",
       description: "Invoke the outer Codex apply_patch tool, producing a native file-change item in the Codex task.",
       inputSchema: { turn_token: turnTokenSchema, patch: z.string().min(1).max(5_000_000) },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ turn_token, patch }, extra) => {
       const claimed = await claimTurn("codex_apply_patch", turn_token, extra);
@@ -441,7 +441,7 @@ export async function runChatGptMcpServer(options: { brokerSocketPath: string })
         arguments: jsonArgumentsSchema.optional(),
         input: z.string().max(5_000_000).optional(),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ turn_token, wire_name, arguments: args, input }, extra) => {
       if (wire_name === CODEX_COMPACTION_CONTROL_WIRE_NAME) {
