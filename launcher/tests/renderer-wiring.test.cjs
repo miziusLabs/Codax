@@ -80,7 +80,7 @@ test("DEV launcher exposes its profile and supervises only its Full-mode MCP run
   assert.doesNotMatch(electronMain, /bigger-context|setBiggerContext|experimentalBiggerContext/);
 });
 
-test("automatic multipart context has no launcher setting or recommendation surface", () => {
+test("removed Bigger Context feature has no launcher setting or recommendation surface", () => {
   assert.doesNotMatch(appSource, /BiggerContextRecommendation|bigger-context-recommendation/);
   assert.doesNotMatch(stylesSource, /bigger-context-recommendation/);
 });

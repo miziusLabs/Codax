@@ -79,21 +79,19 @@ separate compact command.
 
 `/send-fill N` sends deterministic inert text as the current message through the live browser. Use
 it to exercise the one-message composer budget and multi-chunk prompt insertion independently of
-history growth. The normal model-specific browser preflight still applies and fails closed above
-the measured transport limit.
+history growth. The normal model-specific browser preflight still applies; crossing its measured
+transport limit requests automatic compaction and retries the same DEV turn.
 
-## Automatic multipart context transport
+## Automatic browser-input compaction
 
-Sol turns stay on the normal single-message path while their estimated input is below the selected
-mode's browser threshold. At the first threshold the bridge automatically uses two messages; at
-twice that threshold it uses three. There is no separate launcher setting or runtime preference.
-The final context part also commits the transaction and starts the task, so staging adds no fourth
-"start work" message. Codex continues to use the retained Sol model window and its normal model-level
-auto-compaction threshold independently of the browser's one-message transport limit.
+Sol keeps its real 272K model context window and normal 244.8K (90%) model-level auto-compaction
+threshold in Codex. The smaller ChatGPT browser input boundary is enforced separately. If the
+compiled outgoing browser message crosses that boundary, the bridge returns a no-output follow-up
+completion at the normal model compaction threshold; Codex then runs its existing mid-turn
+compaction and retries the same user turn automatically. The bridge always sends one inline context
+message; there is no Bigger Context setting or multipart staging transport. If the same user turn
+still cannot fit after that one automatic compaction, it fails explicitly instead of looping.
 
-Each stage contains complete semantic records, never a raw JSON string cut in the middle. The model
-must return an exact transaction-bound SHA-256 acknowledgement before the next part is sent.
-Images, the MCP connector, and the private `turn_token` are attached only to the final part.
 In Full/MCP mode, compaction does not replay the expanded history into an unrelated summarizer. If
 the source Web response is still waiting on a tool boundary, its canonical tool results finish that
 response first. The exact retained chat then receives one strict checkpoint message with only the
@@ -103,18 +101,8 @@ normal turn timeout.
 The old surface closes only after both the structured handoff and that Web response complete; the
 next epoch then starts a fresh Temporary Chat. If the retained private chat was already closed, the
 bridge starts one read-only fallback chat from the canonical Codex history instead. Browser-only mode
-has no retained MCP boundary and keeps the three-message compaction path so its summarizer receives
-the complete expanded history.
-
-Any missing or malformed acknowledgement fails the whole transaction. No later part or final
-commit is sent, and a retry starts again from part one in a fresh Temporary Chat. Every individual
-stage must still fit the selected ChatGPT mode's measured one-message boundary.
-
-Small turns add no requests. A two-part transaction adds one acknowledgement turn before the final
-commit; a three-part transaction adds two. Browser-only compaction also uses three parts. Large turns
-are therefore slower and may increase the probability of rate limits or a temporary account cooldown.
-Multipart staging is unavailable for Luna because Luna's later requests still include the accumulated
-transcript inside the same measured 28,000-token browser transport budget.
+has no retained MCP boundary and uses the read-only compaction path. A prompt that still exceeds the
+measured one-message boundary after compaction fails explicitly rather than being split.
 
 Browser-only chats do not advertise outer tools and never claim simulated effects. Full setup keeps
 the launcher-owned DEV tunnel ready so ChatGPT can create and validate `Codex Native2 DEV` before a

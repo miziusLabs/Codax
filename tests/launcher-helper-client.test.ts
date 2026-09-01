@@ -131,7 +131,7 @@ test("Bun daemon streams a prepared browser turn through the persistent Node hel
   }
 });
 
-test("launcher helper protocol preserves multipart context and the compaction flag", async () => {
+test("launcher helper protocol preserves compaction prompt metadata", async () => {
   const sent: Record<string, unknown>[] = [];
   const client = new LauncherBrowserHelperClient({
     appName: "Codex Native2 DEV",
@@ -174,7 +174,7 @@ test("launcher helper protocol preserves multipart context and the compaction fl
   };
 
   await expect(client.run({
-    traceId: "multipart-123",
+    traceId: "compaction-123",
     modelId: "gpt-5.6-sol",
     reasoning: "high",
     capabilities: { localToolsEnabled: false, solAvailable: true, proAvailable: true },
@@ -182,7 +182,6 @@ test("launcher helper protocol preserves multipart context and the compaction fl
     prepare: async () => ({
       text: "commit",
       images: [],
-      multipart: { parts: ["{\"part\":1}", "{\"part\":2}", "{\"part\":3}"], commit: "commit" },
       trimmedCompactionMessages: 4,
       release() {},
     }),
@@ -198,9 +197,8 @@ test("launcher helper protocol preserves multipart context and the compaction fl
   expect(sent[1]).toMatchObject({
     type: "prepared_selected_ack",
     prepared: {
-        text: "commit",
-        multipart: { parts: ["{\"part\":1}", "{\"part\":2}", "{\"part\":3}"], commit: "commit" },
-        trimmedCompactionMessages: 4,
+      text: "commit",
+      trimmedCompactionMessages: 4,
     },
   });
 });

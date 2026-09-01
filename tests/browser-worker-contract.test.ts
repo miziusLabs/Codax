@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { Page } from "playwright-core";
-import { CHATGPT_BROWSER_OBSERVATION_PROBE_TIMEOUT_MS, CHATGPT_COMPOSER_DOCUMENT_END_KEY, CHATGPT_STOPPED_THINKING_GRACE_MS, ChatGptBrowserObservationTimeoutError, ChatGptBrowserWorker, ChatGptPromptAttachmentIntegrityError, ChatGptStoppedThinkingTracker, ChatGptTurnDomHealthTracker, ChatGptVisibleTraceTracker, MAX_CHATGPT_BROWSER_PAGE_REBINDS, MAX_CHATGPT_BROWSER_TABS, MAX_CHATGPT_CONNECTOR_TRIGGER_ATTEMPTS, assertChatGptWebInputWithinLimits, assertChatGptWebMultipartInputWithinLimits, browserDiagnosticCheckpoint, browserDiagnosticIncludesScreenshot, chatGptConnectorAttachmentMode, chatGptEffortSelectionRequired, chatGptNewTurnIdentity, chatGptReboundTurnIdentity, chatGptSubmissionEvidence, dismissChatGptTemporaryChatOnboarding, isChatGptTraceControl, redactChatGptUiDiagnostic, resolveBrowserConfig, resolveChatGptToolConfirmation, resolveChatGptWebMultipartStagingMode, stripChatGptTraceControlSuffix, throwIfChatGptRateLimitDialog, throwIfChatGptSessionFailureAlert, throwIfChatGptTerminalErrorAlert, withChatGptBrowserObservationTimeout } from "../src/adapters/chatgpt-web/browser-worker";
+import { CHATGPT_BROWSER_OBSERVATION_PROBE_TIMEOUT_MS, CHATGPT_COMPOSER_DOCUMENT_END_KEY, CHATGPT_STOPPED_THINKING_GRACE_MS, ChatGptBrowserObservationTimeoutError, ChatGptBrowserWorker, ChatGptPromptAttachmentIntegrityError, ChatGptStoppedThinkingTracker, ChatGptTurnDomHealthTracker, ChatGptVisibleTraceTracker, MAX_CHATGPT_BROWSER_PAGE_REBINDS, MAX_CHATGPT_BROWSER_TABS, MAX_CHATGPT_CONNECTOR_TRIGGER_ATTEMPTS, assertChatGptWebInputWithinLimits, browserDiagnosticCheckpoint, browserDiagnosticIncludesScreenshot, chatGptConnectorAttachmentMode, chatGptEffortSelectionRequired, chatGptNewTurnIdentity, chatGptReboundTurnIdentity, chatGptSubmissionEvidence, dismissChatGptTemporaryChatOnboarding, isChatGptTraceControl, redactChatGptUiDiagnostic, resolveBrowserConfig, resolveChatGptToolConfirmation, stripChatGptTraceControlSuffix, throwIfChatGptRateLimitDialog, throwIfChatGptSessionFailureAlert, throwIfChatGptTerminalErrorAlert, withChatGptBrowserObservationTimeout } from "../src/adapters/chatgpt-web/browser-worker";
 import { chatGptStoppedThinkingError } from "../src/adapters/chatgpt-web/adapter-error";
 import { CHATGPT_WEB_MODEL_ID } from "../src/adapters/chatgpt-web/model";
 import { CHATGPT_CONNECTOR_NAME, DEV_CHATGPT_CONNECTOR_NAME, defaultChromeExecutable, legacyChatGptConnectorMigrationMessage } from "../src/config";
@@ -32,7 +32,7 @@ test("browser turn orchestration retains owned prompt insertion and semantic sub
   expect(workerSource).toContain("await this.waitForSubmissionAccepted(");
   const sendAttachedPrompt = workerSource.slice(
     workerSource.indexOf("  private async sendAttachedPrompt("),
-    workerSource.indexOf("  private async waitForMultipartAcknowledgement("),
+    workerSource.indexOf("  private async resetCompactionComposerForRetry("),
   );
   const sendSettled = sendAttachedPrompt.indexOf("await settleChatGptUi()");
   const sendDeadline = sendAttachedPrompt.indexOf("CHATGPT_SEND_ENABLE_GRACE_MS", sendSettled);
@@ -58,19 +58,16 @@ test("browser turn orchestration retains owned prompt insertion and semantic sub
   expect(sendAttachedPrompt).toContain("await submissionLifecycle?.onSendActivated?.()");
   expect(submitted).toBeGreaterThan(submissionWait);
   expect(runBrowserTurn).toContain("this.sendAttachedPrompt(");
-  expect(runBrowserTurn).toContain("formatChatGptWebMultipartStage(");
-  expect(runBrowserTurn).toContain("waitForMultipartAcknowledgement(");
-  expect(runBrowserTurn).toContain("formatChatGptWebMultipartCommit(");
-  expect(runBrowserTurn).toContain("resolveChatGptWebMultipartStagingMode(");
-  expect(runBrowserTurn).toContain('"final_part_effort_selection"');
+  expect(runBrowserTurn).not.toContain("formatChatGptWebMultipartStage(");
+  expect(runBrowserTurn).not.toContain("waitForMultipartAcknowledgement(");
+  expect(runBrowserTurn).not.toContain("formatChatGptWebMultipartCommit(");
+  expect(runBrowserTurn).not.toContain("resolveChatGptWebMultipartStagingMode(");
+  expect(runBrowserTurn).not.toContain('"final_part_effort_selection"');
   const promptAttached = runBrowserTurn.indexOf('await diagnostics.capture(page, "prompt-attachment-complete")');
-  const finalEffortSelected = runBrowserTurn.indexOf('"final_part_effort_selection"');
   const finalSend = runBrowserTurn.indexOf("const finalSubmissionEvidence");
   expect(promptAttached).toBeGreaterThan(-1);
-  expect(finalEffortSelected).toBeGreaterThan(-1);
-  expect(promptAttached).toBeGreaterThan(finalEffortSelected);
   expect(finalSend).toBeGreaterThan(promptAttached);
-  expect(runBrowserTurn.slice(finalEffortSelected, promptAttached)).toContain(
+  expect(runBrowserTurn.slice(0, promptAttached)).toContain(
     "this.selectModelAndEffort(",
   );
   expect(runBrowserTurn).not.toContain("userTurns.nth(initialUserTurnCount).waitFor");
@@ -116,10 +113,9 @@ test("a retained MCP conversation reuses its proven connector binding", () => {
   expect(chatGptConnectorAttachmentMode(false, false)).toBe("none");
 });
 
-test("a retained conversation preserves its proven effort unless multipart staging needs another one", () => {
-  expect(chatGptEffortSelectionRequired(false, "medium", "medium")).toBeTrue();
-  expect(chatGptEffortSelectionRequired(true, "medium", "medium")).toBeFalse();
-  expect(chatGptEffortSelectionRequired(true, "medium", "light")).toBeTrue();
+test("a retained conversation preserves its proven effort", () => {
+  expect(chatGptEffortSelectionRequired(false)).toBeTrue();
+  expect(chatGptEffortSelectionRequired(true)).toBeFalse();
 });
 
 test("browser turns run concurrently up to the five-tab limit", async () => {
@@ -1622,20 +1618,20 @@ test("browser preflight separates model context from one-message transport limit
       name: "ChatGptWebAdapterError",
       status: 400,
       errorType: "invalid_request_error",
-      code: "context_length_exceeded",
+      code: "chatgpt_browser_input_limit",
       retryable: false,
     });
-    expect(String(error)).toContain("/compact");
+    expect(String(error)).toContain("browser request");
   }
 
   expect(() => assertChatGptWebInputWithinLimits(40_999, 32_807, "gpt-5.6-sol", "low", plus)).not.toThrow();
   expect(() => assertChatGptWebInputWithinLimits(41_000, 32_808, "gpt-5.6-sol", "low", plus)).toThrow(
-    "41,000-token context window",
+    "41,000-token ChatGPT input boundary",
   );
   expect(() => assertChatGptWebInputWithinLimits(89_999, 81_807, "gpt-5.6-sol", "medium", plus)).not.toThrow();
   expect(() => assertChatGptWebInputWithinLimits(89_999, 81_807, "gpt-5.6-sol", "high", plus)).not.toThrow();
   expect(() => assertChatGptWebInputWithinLimits(90_000, 81_808, "gpt-5.6-sol", "high", plus)).toThrow(
-    "90,000-token context window",
+    "90,000-token ChatGPT input boundary",
   );
   expect(() => assertChatGptWebInputWithinLimits(100_000, 100_000, "gpt-5.6-sol", "xhigh", pro)).not.toThrow();
   expect(() => assertChatGptWebInputWithinLimits(100_000, 100_000, "gpt-5.6-sol", "max", pro)).not.toThrow();
@@ -1711,88 +1707,6 @@ test("browser preflight separates model context from one-message transport limit
     pro,
     520_001,
   )).toThrow("104,000-token ChatGPT browser message boundary");
-});
-
-test("multipart preflight expands only the total transport ceiling and keeps each message boundary", () => {
-  const pro = { localToolsEnabled: false, solAvailable: true, proAvailable: true };
-  expect(() => assertChatGptWebMultipartInputWithinLimits(
-    280_000,
-    95_000,
-    "gpt-5.6-sol",
-    "high",
-    pro,
-    900_000,
-    3,
-  )).not.toThrow();
-  expect(() => assertChatGptWebMultipartInputWithinLimits(
-    333_579,
-    95_000,
-    "gpt-5.6-sol",
-    "high",
-    pro,
-    900_000,
-    3,
-  )).toThrow("three-part transport ceiling");
-  expect(() => assertChatGptWebMultipartInputWithinLimits(
-    222_386,
-    95_000,
-    "gpt-5.6-sol",
-    "high",
-    pro,
-    900_000,
-    2,
-  )).toThrow("two-part transport ceiling");
-  expect(() => assertChatGptWebMultipartInputWithinLimits(
-    280_000,
-    103_001,
-    "gpt-5.6-sol",
-    "high",
-    pro,
-    900_000,
-    3,
-  )).toThrow("ChatGPT message boundary");
-  expect(() => assertChatGptWebMultipartInputWithinLimits(
-    20_000,
-    10_000,
-    "gpt-5.6-luna",
-    "low",
-    { localToolsEnabled: false, solAvailable: false, proAvailable: false },
-    40_000,
-    2,
-  )).toThrow("unavailable for Luna");
-});
-
-test("multipart stages use the lowest account mode that can carry the stage", () => {
-  const plus = { localToolsEnabled: false, solAvailable: true, proAvailable: false };
-  const pro = { localToolsEnabled: false, solAvailable: true, proAvailable: true };
-  expect(resolveChatGptWebMultipartStagingMode("gpt-5.6-sol", plus, "medium", 30_000, 200_000).effort).toBe("medium");
-  expect(resolveChatGptWebMultipartStagingMode("gpt-5.6-sol", plus, "high", 30_000, 300_000).effort).toBe("medium");
-  expect(resolveChatGptWebMultipartStagingMode("gpt-5.6-sol", pro, "medium", 100_000, 500_000).effort).toBe("low");
-  expect(resolveChatGptWebMultipartStagingMode("gpt-5.6-sol", pro, "medium", 100_000, 600_000).effort).toBe("medium");
-  expect(resolveChatGptWebMultipartStagingMode("gpt-5.6-sol", pro, "max", 104_000, 1_200_000).effort).toBe("max");
-  expect(() => resolveChatGptWebMultipartStagingMode(
-    "gpt-5.6-luna",
-    { localToolsEnabled: false, solAvailable: false, proAvailable: false },
-    "low",
-    10_000,
-    20_000,
-  )).toThrow("Luna-only");
-  expect(() => assertChatGptWebMultipartInputWithinLimits(
-    100_000,
-    30_000,
-    "gpt-5.6-sol",
-    "low",
-    plus,
-    300_000,
-    3,
-    {
-      stagingEffort: "medium",
-      maxStageMessageTokens: 30_000,
-      maxStageChars: 300_000,
-      finalMessageTokens: 1_000,
-      finalMessageChars: 4_000,
-    },
-  )).not.toThrow();
 });
 
 test("browser diagnostics redact context envelopes and capability values", () => {
@@ -2034,9 +1948,9 @@ test("response DOM separates streaming commentary from the final Markdown answer
   expect(workerSource).toContain("if (completionTracker.update({");
   expect(workerSource).not.toContain("markdownBuffer.currentSnapshotIsConsistent() && completionTracker.update");
   expect(workerSource).not.toContain("streamCompletedBlocks");
-  expect(workerSource).toContain('code: "multipart_protocol_violation"');
-  expect(workerSource).not.toContain("multipartFailed");
-  expect(workerSource).toContain('"final_part_effort_selection"');
+  expect(workerSource).not.toContain("multipart_protocol_violation");
+  expect(workerSource).not.toContain("multipart_stage_");
+  expect(workerSource).not.toContain('"final_part_effort_selection"');
   expect(workerSource).not.toContain("stableHtml:");
   expect(workerSource).not.toContain("observeStableHtml");
   expect(workerSource).toContain("const overlapsRenderedAnswer = (candidate: HTMLElement)");

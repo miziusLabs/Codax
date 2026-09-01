@@ -86,7 +86,12 @@ describe("ChatGPT Web model routing", () => {
       effectiveContextWindowPercent: 89,
       autoCompactTokenLimit: 80_000,
     });
-    for (const effort of ["low", "medium", "high"] as const) {
+    expect(resolveChatGptWebModelContextLimits(CHATGPT_WEB_BACKEND_MODEL, "low", plus)).toEqual({
+      contextWindow: 272_000,
+      effectiveContextWindowPercent: 90,
+      autoCompactTokenLimit: 244_800,
+    });
+    for (const effort of ["medium", "high"] as const) {
       expect(resolveChatGptWebModelContextLimits(CHATGPT_WEB_BACKEND_MODEL, effort, plus)).toEqual({
         contextWindow: 272_000,
         effectiveContextWindowPercent: 90,
@@ -158,7 +163,7 @@ describe("ChatGPT Web model routing", () => {
     });
   });
 
-  test("keeps one-message browser transport separate from retained Sol model headroom", () => {
+  test("compacts for the browser input limit without shrinking retained Sol model headroom", () => {
     expect(resolveChatGptWebContextLimits(CHATGPT_WEB_BACKEND_MODEL, "max", pro)).toEqual({
       contextWindow: 112_193,
       effectiveContextWindowPercent: 85,

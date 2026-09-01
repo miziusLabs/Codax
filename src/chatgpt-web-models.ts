@@ -14,6 +14,8 @@ export const CHATGPT_WEB_SOL_MODEL_CONTEXT_WINDOW = 272_000;
 export const CHATGPT_WEB_LUNA_MODEL_CONTEXT_WINDOW = 128_000;
 /** Leave headroom for the next ChatGPT turn instead of compacting exactly at the hard model cap. */
 export const CHATGPT_WEB_MODEL_AUTO_COMPACT_PERCENT = 90;
+export const CHATGPT_WEB_SOL_MODEL_AUTO_COMPACT_TOKEN_LIMIT =
+  Math.floor((CHATGPT_WEB_SOL_MODEL_CONTEXT_WINDOW * CHATGPT_WEB_MODEL_AUTO_COMPACT_PERCENT) / 100);
 
 /**
  * Measured Plus browser transport/task windows, including the fixed hidden ChatGPT platform reserve.
@@ -76,10 +78,6 @@ function modelContextWindow(backendModel: ChatGptWebBackendModel): number {
     : CHATGPT_WEB_SOL_MODEL_CONTEXT_WINDOW;
 }
 
-function maxModelAutoCompactTokenLimit(contextWindow: number): number {
-  return Math.floor((contextWindow * CHATGPT_WEB_MODEL_AUTO_COMPACT_PERCENT) / 100);
-}
-
 /** Resolve the practical browser/task limit for the selected visible ChatGPT mode. */
 export function resolveChatGptWebContextLimits(
   backendModel: ChatGptWebBackendModel,
@@ -119,12 +117,7 @@ export function resolveChatGptWebContextLimits(
   return limits;
 }
 
-/**
- * Resolve the ChatGPT model window exposed to Codex. Retained browser conversations already carry
- * completed history inside ChatGPT, so normal follow-ups send only the suffix after the last
- * assistant turn. Per-message browser transport ceilings therefore must not lower Codex's model-
- * level compaction point; they remain enforced separately by resolveChatGptWebContextLimits().
- */
+/** Keep browser transport limits out of Codex's model-level context accounting. */
 export function resolveChatGptWebModelContextLimits(
   backendModel: ChatGptWebBackendModel,
   _effort: ChatGptWebAdapterEffort,
@@ -134,7 +127,7 @@ export function resolveChatGptWebModelContextLimits(
   if (backendModel === CHATGPT_WEB_LUNA_BACKEND_MODEL) {
     return contextLimits(contextWindow, contextWindow);
   }
-  return contextLimits(contextWindow, maxModelAutoCompactTokenLimit(contextWindow));
+  return contextLimits(contextWindow, CHATGPT_WEB_SOL_MODEL_AUTO_COMPACT_TOKEN_LIMIT);
 }
 
 /** Resolve limits of one visible ChatGPT composer message, independently of model context. */

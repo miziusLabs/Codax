@@ -1,10 +1,6 @@
 import { CHATGPT_WEB_PLATFORM_RESERVE_TOKENS } from "../../chatgpt-web-models";
 import { estimateTokens } from "../../lib/token-estimate";
-import {
-  formatChatGptWebMultipartCommit,
-  formatChatGptWebMultipartStage,
-  type CompiledChatGptWebPrompt,
-} from "./prompt";
+import type { CompiledChatGptWebPrompt } from "./prompt";
 
 // ChatGPT's product system prompt and the fixed Codex Native MCP schemas are not present in the
 // visible composer text. Reserve them explicitly; over-counting fails safe by compacting earlier.
@@ -18,21 +14,8 @@ const CHATGPT_ORIGINAL_IMAGE_RESERVE_TOKENS = 8_192;
  */
 export const CHATGPT_LUNA_BROWSER_INPUT_TOKEN_BUDGET = 28_000;
 
-const TOKEN_ESTIMATE_TRANSACTION = `ctx_${"0".repeat(32)}`;
-
 export function compiledChatGptWebMessages(compiled: CompiledChatGptWebPrompt): string[] {
-  if (!compiled.multipart) return [compiled.text];
-  return [
-    ...compiled.multipart.parts.slice(0, -1).map((payload, index) => (
-      formatChatGptWebMultipartStage(
-        payload,
-        TOKEN_ESTIMATE_TRANSACTION,
-        index + 1,
-        compiled.multipart!.parts.length,
-      ).text
-    )),
-    formatChatGptWebMultipartCommit(compiled.multipart, TOKEN_ESTIMATE_TRANSACTION),
-  ];
+  return [compiled.text];
 }
 
 export function compiledChatGptWebMaxMessageChars(compiled: CompiledChatGptWebPrompt): number {
@@ -59,16 +42,5 @@ export function estimateCompiledChatGptWebInputTokens(
   );
   const messageTokens = compiledChatGptWebMessages(compiled)
     .reduce((total, message) => total + estimateTokens(message, modelId), 0);
-  const acknowledgementTokens = compiled.multipart
-    ? compiled.multipart.parts.slice(0, -1).reduce((total, payload, index) => total + estimateTokens(
-      formatChatGptWebMultipartStage(
-        payload,
-        TOKEN_ESTIMATE_TRANSACTION,
-        index + 1,
-        compiled.multipart!.parts.length,
-      ).acknowledgement,
-      modelId,
-    ), 0)
-    : 0;
-  return CHATGPT_WEB_PLATFORM_RESERVE_TOKENS + messageTokens + acknowledgementTokens + imageTokens;
+  return CHATGPT_WEB_PLATFORM_RESERVE_TOKENS + messageTokens + imageTokens;
 }

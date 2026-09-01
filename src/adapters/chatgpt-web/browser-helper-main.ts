@@ -315,17 +315,6 @@ input.on("line", line => {
       abortControllers.get(message.id)?.abort();
       return;
     }
-    if (prepared.multipart !== undefined) {
-      const multipart = prepared.multipart;
-      if (!multipart || !Array.isArray(multipart.parts)
-        || (multipart.parts.length !== 2 && multipart.parts.length !== 3)
-        || multipart.parts.some(part => typeof part !== "string")
-        || typeof multipart.commit !== "string") {
-        writeProtocol({ type: "error", id: message.id, message: "Browser helper multipart prompt is invalid" });
-        abortControllers.get(message.id)?.abort();
-        return;
-      }
-    }
     const selection = preparedSelections.get(message.id);
     if (!selection) {
       writeProtocol({ type: "error", id: message.id, message: "Browser helper has no pending prompt selection" });

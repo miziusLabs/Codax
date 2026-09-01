@@ -1,18 +1,19 @@
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { CHATGPT_WEB_SOL_MODEL_AUTO_COMPACT_TOKEN_LIMIT } from "../../chatgpt-web-models";
 import { defaultBrokerEndpoint, expandUserPath, resolveBrokerEndpoint } from "../../config";
 import { namespacedToolName, type AdapterEvent, type CodexContentPart, type CodexParsedRequest, type CodexProviderConfig, type CodexToolResultMessage, type CodexUsage } from "../../types";
 import type { ProviderAdapter } from "../base";
 import { parseDataUrl } from "../image";
-import { ChatGptWebAdapterError } from "./adapter-error";
+import { ChatGptWebAdapterError, isChatGptBrowserInputLimitError } from "./adapter-error";
 import { ChatGptBrowserWorker } from "./browser-worker";
 import { extractChatGptTurnEnvironment, extractChatGptTurnIdentity } from "./environment";
 import { CHATGPT_WEB_LUNA_MODEL_ID, resolveChatGptWebModelMode, type ChatGptWebCapabilities } from "./model";
 import { chatGptReadOnlyContextWarning, compileChatGptWebPrompt } from "./prompt";
-import { chatGptWebTurnRetryPolicy } from "./retry-policy";
+import { chatGptWebInputCompactionPolicy, chatGptWebTurnRetryPolicy } from "./retry-policy";
 import { TurnBroker, type BrokerToolRequest, type BrokerToolResult, type TurnBrokerOwner } from "./turn-broker";
 import { ChatGptTextFeed, ChatGptTraceFeed, chatGptCompactionSourceExecutionKey, chatGptThreadOwnershipKey, chatGptTurnExecutionKey, chatGptTurnRetryKey, chatGptTurnRoundKey, chatGptTurnSessions, type ChatGptBrowserOutcome, type ChatGptTraceEvent, type ChatGptTurnRuntime, type ChatGptTurnSession } from "./turn-execution";
-import { estimateChatGptWebUsage, resolveBiggerContextMultipartParts } from "./usage";
+import { estimateChatGptWebUsage } from "./usage";
 import { ChatGptThreadEnvironmentStore } from "./thread-environment";
 import {
   ChatGptLunaCheckpointStore,
@@ -161,6 +162,23 @@ function emitBrowserCompletion(outcome: ChatGptBrowserOutcome, usage: CodexUsage
   emit({ type: "done", stopReason: "stop", endTurn: true, usage });
 }
 
+function emitBrowserInputAutoCompact(emit: (event: AdapterEvent) => void): void {
+  // Codex runs mid-turn auto-compaction only after a successful response requests a follow-up at
+  // its model-level compaction threshold. This response has no model output; it only enters that
+  // native path while the advertised Sol window remains 272K / 244.8K.
+  emit({
+    type: "done",
+    stopReason: "stop",
+    endTurn: false,
+    usage: {
+      inputTokens: CHATGPT_WEB_SOL_MODEL_AUTO_COMPACT_TOKEN_LIMIT,
+      outputTokens: 0,
+      totalTokens: CHATGPT_WEB_SOL_MODEL_AUTO_COMPACT_TOKEN_LIMIT,
+      estimated: true,
+    },
+  });
+}
+
 function emitTraceEvents(trace: ChatGptTraceEvent[], emit: (event: AdapterEvent) => void): void {
   for (const event of trace) {
     if (!event.continuation) emit({ type: "assistant_boundary" });
@@ -285,12 +303,8 @@ export function createChatGptWebAdapter(
       ? chatGptConversationKey(checkpointInput.parsed, executionNamespace)
       : undefined;
     const compileOptionsFor = (input: CodexParsedRequest) => {
-      const experimentalMultipartParts = resolveBiggerContextMultipartParts(input, turnCapabilities);
       return {
         captureLunaCheckpoint,
-        ...(experimentalMultipartParts !== undefined
-          ? { experimentalMultipartParts }
-          : {}),
       };
     };
     if (captureLunaCheckpoint) {
@@ -640,6 +654,7 @@ export function createChatGptWebAdapter(
             ));
             session.completeRound(roundKey);
             chatGptWebTurnRetryPolicy.clear(retryKey);
+            chatGptWebInputCompactionPolicy.clear(retryKey);
             return;
           }
 
@@ -741,6 +756,7 @@ export function createChatGptWebAdapter(
                 ));
                 session.completeRound(roundKey);
                 chatGptWebTurnRetryPolicy.clear(retryKey);
+                chatGptWebInputCompactionPolicy.clear(retryKey);
                 return;
               }
               if (!turnToken || session.runtime.mode !== "tools") {
@@ -767,7 +783,28 @@ export function createChatGptWebAdapter(
           // the same canonical request can reconnect without another ChatGPT submission.
           throw error;
         }
-        const turnError = submittedTurnFailure(session, error);
+        let turnError = submittedTurnFailure(session, error);
+        if (isChatGptBrowserInputLimitError(turnError)) {
+          if (!parsed._compactionRequest && chatGptWebInputCompactionPolicy.request(retryKey)) {
+            chatGptWebTurnRetryPolicy.clear(retryKey);
+            session.cancel();
+            emitRoundBatch(buffer => emitBrowserInputAutoCompact(buffer));
+            session.completeRound(roundKey);
+            return;
+          }
+          chatGptWebInputCompactionPolicy.clear(retryKey);
+          turnError = new ChatGptWebAdapterError(
+            parsed._compactionRequest
+              ? `ChatGPT could not fit the automatic compaction request inside its browser input boundary: ${turnError.message}`
+              : `The current Codex turn still exceeds ChatGPT's browser input boundary after automatic compaction: ${turnError.message}`,
+            {
+              status: 400,
+              errorType: "invalid_request_error",
+              code: "context_length_exceeded",
+              retryable: false,
+            },
+          );
+        }
         const handledError = turnError instanceof ChatGptWebAdapterError && turnError.retryable
           ? chatGptWebTurnRetryPolicy.recordRetryableFailure(retryKey, turnError)
           : turnError;

@@ -503,14 +503,23 @@ export class DevChatDriver {
       const output = historyOutput(envelope.output!, turnId);
       workingInput.push(...output);
       const roundUsage = usageOf(envelope);
+      const calls = toolCalls(output);
+      if (calls.length === 0 && envelope.end_turn !== true) {
+        // Production uses a no-output/end_turn=false response to ask native Codex for mid-turn
+        // compaction when the compiled browser message exceeds ChatGPT's one-message boundary.
+        // DEV has no outer Codex loop, so perform the equivalent compaction locally and retry.
+        if (state.model === "chatgpt-web/luna") {
+          throw new Error("DEV Luna received an unsupported browser-input compaction request");
+        }
+        workingInput = await this.compactInput(state, workingInput, "automatic", emit);
+        pendingCompactions += 1;
+        compactions += 1;
+        continue;
+      }
       usage.inputTokens += roundUsage.inputTokens;
       usage.outputTokens += roundUsage.outputTokens;
       usage.totalTokens += roundUsage.totalTokens;
-      const calls = toolCalls(output);
       if (calls.length === 0) {
-        if (envelope.end_turn !== true) {
-          throw new Error("DEV Responses turn completed without tool calls or end_turn=true");
-        }
         finalText = outputText(output);
         state.input = workingInput;
         state.turns += 1;

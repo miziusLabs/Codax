@@ -21,6 +21,23 @@ export class ChatGptWebAdapterError extends Error {
   }
 }
 
+/** Internal pre-submit signal: one compiled browser message exceeded ChatGPT's product boundary. */
+export const CHATGPT_BROWSER_INPUT_LIMIT_ERROR_CODE = "chatgpt_browser_input_limit";
+
+export function chatGptBrowserInputLimitError(message: string): ChatGptWebAdapterError {
+  return new ChatGptWebAdapterError(message, {
+    status: 400,
+    errorType: "invalid_request_error",
+    code: CHATGPT_BROWSER_INPUT_LIMIT_ERROR_CODE,
+    retryable: false,
+  });
+}
+
+export function isChatGptBrowserInputLimitError(error: unknown): error is ChatGptWebAdapterError {
+  return error instanceof ChatGptWebAdapterError
+    && error.code === CHATGPT_BROWSER_INPUT_LIMIT_ERROR_CODE;
+}
+
 export function chatGptBrowserTabClosedError(): ChatGptWebAdapterError {
   return new ChatGptWebAdapterError(
     "The ChatGPT browser tab was closed, so the Codex turn was cancelled.",

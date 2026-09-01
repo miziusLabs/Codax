@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { buildResponseJSON } from "../src/bridge";
-import { ChatGptWebAdapterError } from "../src/adapters/chatgpt-web/adapter-error";
+import { ChatGptWebAdapterError, chatGptBrowserInputLimitError } from "../src/adapters/chatgpt-web/adapter-error";
 import { ChatGptCompletionTracker, chatGptImageFilePayloads, chatGptPromptFilePayloads, chatGptTurnIsComplete } from "../src/adapters/chatgpt-web/browser-worker";
 import { ChatGptBrowserWorker, type BrowserTurn } from "../src/adapters/chatgpt-web/browser-worker";
 import { extractChatGptTurnEnvironment, extractChatGptTurnIdentity } from "../src/adapters/chatgpt-web/environment";
@@ -1048,6 +1048,64 @@ describe("ChatGPT outer-native harness v4", () => {
     } finally {
       (worker as unknown as { run: (turn: BrowserTurn) => Promise<string> }).run = originalRun;
       await TurnBroker.forSocket(socketPath).close();
+    }
+  });
+
+  test("browser input overflow requests one native mid-turn compaction without shrinking the model window", async () => {
+    const provider: CodexProviderConfig = {
+      adapter: "chatgpt-web",
+      baseUrl: `browser://chatgpt-input-compaction-${Date.now()}`,
+      chatgptWeb: { localToolsEnabled: false, solAvailable: true, proAvailable: false },
+    };
+    const worker = ChatGptBrowserWorker.forProvider(provider);
+    const originalRun = worker.run.bind(worker);
+    let browserStarts = 0;
+    (worker as unknown as { run: (turn: BrowserTurn) => Promise<string> }).run = async () => {
+      browserStarts += 1;
+      throw chatGptBrowserInputLimitError("compiled browser message exceeds the Plus input boundary");
+    };
+    const request = rawWireRequest(environmentXml);
+    const executionKey = `${chatGptWebExecutionNamespace(provider)}:${chatGptTurnExecutionKey(request)}`;
+    try {
+      const firstEvents: AdapterEvent[] = [];
+      await createChatGptWebAdapter(provider).runTurn!(
+        request,
+        { headers: new Headers() },
+        event => firstEvents.push(event),
+      );
+      expect(firstEvents.at(-1)).toEqual({
+        type: "done",
+        stopReason: "stop",
+        endTurn: false,
+        usage: {
+          inputTokens: 244_800,
+          outputTokens: 0,
+          totalTokens: 244_800,
+          estimated: true,
+        },
+      });
+      expect(firstEvents.some(event => event.type === "error")).toBeFalse();
+
+      // Native Codex compaction retires the source response before retrying the same user turn.
+      expect(await chatGptTurnSessions.retireAndWait(executionKey)).toBeTrue();
+
+      const retryEvents: AdapterEvent[] = [];
+      await createChatGptWebAdapter(provider).runTurn!(
+        request,
+        { headers: new Headers() },
+        event => retryEvents.push(event),
+      );
+      expect(retryEvents.at(-1)).toMatchObject({
+        type: "error",
+        code: "context_length_exceeded",
+        retryable: false,
+      });
+      expect((retryEvents.at(-1) as Extract<AdapterEvent, { type: "error" }>).message)
+        .toContain("after automatic compaction");
+      expect(browserStarts).toBe(2);
+    } finally {
+      (worker as unknown as { run: (turn: BrowserTurn) => Promise<string> }).run = originalRun;
+      await chatGptTurnSessions.retireAndWait(executionKey);
     }
   });
 

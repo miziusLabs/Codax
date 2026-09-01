@@ -116,8 +116,8 @@ test("new DEV chats default to the cheapest account-supported browser model", ()
   expect(defaultDevChatModel({ ...defaultConfig("full"), solAvailable: false })).toBe("chatgpt-web/luna");
 });
 
-test("DEV compaction follows retained Sol model headroom while browser staging stays transport-only", async () => {
-  const root = scratch("cgw-dev-multipart-context");
+test("DEV reports the real Sol model compaction threshold independently of browser transport", async () => {
+  const root = scratch("cgw-dev-auto-compact");
   const config = {
     ...defaultConfig("browser-only"),
     purpose: "dev-harness" as const,
@@ -125,7 +125,7 @@ test("DEV compaction follows retained Sol model headroom while browser staging s
     proAvailable: true,
   };
   const factory = (): ProviderAdapter => ({
-    name: "dev-multipart-context-test",
+    name: "dev-auto-compact-test",
     async runTurn(_parsed, _incoming, emit) {
       emit({ type: "text_delta", text: "unused", phase: "final_answer" });
       emit({
@@ -314,7 +314,7 @@ test("DEV driver uses shared browser methods and its own broker while an unrelat
   }
 });
 
-test("synthetic fill crosses the retained Sol threshold and triggers the real compact handler", async () => {
+test("synthetic fill crosses the Sol model threshold and triggers the real compact handler", async () => {
   const root = scratch("cgw-dev-compact");
   const config = defaultConfig("full");
   let compactRuns = 0;
@@ -336,7 +336,12 @@ test("synthetic fill crosses the retained Sol threshold and triggers the real co
   const store = new DevChatStore(join(root, "chats"));
   const driver = new DevChatDriver(config, store, factory, root);
   const state = driver.open("auto-compact", "chatgpt-web/gpt-5.6-sol").state;
-  driver.fill(state, 240_000);
+  driver.fill(state, 40_000);
+  expect(driver.status(state)).toMatchObject({
+    autoCompactTokenLimit: 244_800,
+    contextWindow: 272_000,
+  });
+  driver.fill(state, 250_000);
   expect(driver.status(state).inputTokens).toBeGreaterThanOrEqual(244_800);
   const events: string[] = [];
   const result = await driver.send(state, "Continue after compacting the synthetic history.", event => events.push(event.type));
