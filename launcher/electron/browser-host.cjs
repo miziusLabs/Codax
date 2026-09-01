@@ -271,6 +271,7 @@ class BrowserHost {
     control,
     cancelTurn,
     getConnectorName,
+    getPreferences,
     helper,
     logger,
     partition = "persist:codex-web-gpt-chatgpt",
@@ -286,6 +287,7 @@ class BrowserHost {
     this.control = control;
     this.cancelTurn = cancelTurn;
     this.getConnectorName = getConnectorName;
+    this.getPreferences = getPreferences;
     this.helper = helper;
     this.logger = logger;
     if (profile !== "production" && profile !== "development") {
@@ -439,6 +441,7 @@ class BrowserHost {
       rendererReady: false,
       deviceEmulationViewport: null,
       deviceEmulationDirty: true,
+      viewportCssKey: null,
       bootstrapDeadlineAt: Date.now() + TURN_TAB_BOOTSTRAP_TIMEOUT_MS,
       lastHeartbeatAt: Date.now(),
     };
@@ -549,7 +552,7 @@ class BrowserHost {
       tab.rendererReady = true;
       if (tab.url.startsWith(CHATGPT_ORIGIN)) tab.bootstrapReady = true;
       this.syncViewVisibility();
-      void contents.insertCSS(CHATGPT_VIEWPORT_CSS).catch(() => {});
+      void this.applyViewportCss(contents, tab);
       void contents.executeJavaScript(ownedSurfaceScript(tab.surfaceId), true).then(
         () => this.publishState?.(this.snapshot()),
         (error) => {
@@ -791,6 +794,7 @@ class BrowserHost {
   }
 
   shouldBlockChatGptBackgroundRequest(details) {
+    if (this.getPreferences?.()?.disableChatGptBrowserWorkarounds === true) return false;
     if (!shouldBlockChatGptBackgroundRequest(details?.url)) return false;
     const webContentsId = details?.webContentsId;
     if (this.view?.webContents?.id === webContentsId) return true;
@@ -1289,14 +1293,30 @@ class BrowserHost {
     }
   }
 
-  async applyViewportCss() {
-    const contents = this.view?.webContents;
-    if (!contents || contents.isDestroyed()) return;
-    if (this.viewportCssKey) {
-      await contents.removeInsertedCSS(this.viewportCssKey).catch(() => {});
-      this.viewportCssKey = null;
+  async applyViewportCss(contents = null, tab = null) {
+    if (!contents) {
+      const targets = [];
+      if (this.view?.webContents) targets.push(this.applyViewportCss(this.view.webContents));
+      for (const turnTab of this.turnTabs.values()) {
+        if (turnTab.view?.webContents) targets.push(this.applyViewportCss(turnTab.view.webContents, turnTab));
+      }
+      await Promise.all(targets);
+      return;
     }
-    this.viewportCssKey = await contents.insertCSS(CHATGPT_VIEWPORT_CSS).catch(() => null);
+    if (contents.isDestroyed()) return;
+    const previousKey = tab ? tab.viewportCssKey : this.viewportCssKey;
+    if (previousKey) await contents.removeInsertedCSS(previousKey).catch(() => {});
+    if (tab) tab.viewportCssKey = null;
+    else this.viewportCssKey = null;
+    if (this.getPreferences?.()?.disableChatGptBrowserWorkarounds === true) return;
+    const key = await contents.insertCSS(CHATGPT_VIEWPORT_CSS).catch(() => null);
+    if (!key) return;
+    if (this.getPreferences?.()?.disableChatGptBrowserWorkarounds === true) {
+      await contents.removeInsertedCSS(key).catch(() => {});
+      return;
+    }
+    if (tab) tab.viewportCssKey = key;
+    else this.viewportCssKey = key;
   }
 
   async markOwnedSurface() {

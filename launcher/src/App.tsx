@@ -1336,6 +1336,14 @@ function SettingsSurface({
               .catch((cause) => setError(messageOf(cause)))}
           />
         </SettingRow>
+        <SettingRow body={copy.disableBrowserWorkaroundsBody} label={copy.disableBrowserWorkarounds}>
+          <Switch
+            checked={snapshot.state.disableChatGptBrowserWorkarounds}
+            onChange={(checked) => void api!.setPreference("disableChatGptBrowserWorkarounds", checked)
+              .then(updateState)
+              .catch((cause) => setError(messageOf(cause)))}
+          />
+        </SettingRow>
         <SettingRow body={copy.biggerContextBody} label={copy.biggerContext}>
           <Switch
             checked={snapshot.state.experimentalBiggerContext}

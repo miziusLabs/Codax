@@ -641,10 +641,14 @@ function registerIpc({ logger, stateStore }) {
     if (!IS_DEV_PROFILE) startCatalogVerificationMonitor({ logger, stateStore });
     return state;
   });
-  handle("launcher:set-preference", (_event, key, value) => {
-    const ordinary = key === "keepRunningOnClose" || key === "showBrowserDuringTurns";
+  handle("launcher:set-preference", async (_event, key, value) => {
+    const ordinary = key === "keepRunningOnClose"
+      || key === "showBrowserDuringTurns"
+      || key === "disableChatGptBrowserWorkarounds";
     if (!ordinary) throw new Error("Unknown preference");
-    return stateStore.update({ [key]: value === true });
+    const state = stateStore.update({ [key]: value === true });
+    if (key === "disableChatGptBrowserWorkarounds") await browserHost?.applyViewportCss();
+    return state;
   });
   handle("launcher:sidebar-state", (_event, value) => stateStore.update(validateSidebarState(value)));
   handle("launcher:logs", (_event, limit) => logger.recent(limit));
@@ -811,6 +815,7 @@ async function start() {
     control: browserControl.descriptor(),
     cancelTurn: IS_DEV_PROFILE ? undefined : traceId => runtimeSupervisor.cancelBrowserTurn(traceId),
     getConnectorName: () => runtimeHost.browserConnectorName(),
+    getPreferences: () => stateStore.read(),
     helper: { executable: process.execPath, script: BROWSER_HELPER_PATH },
     logger,
     partition: LAUNCHER_PROFILE.browserPartition,

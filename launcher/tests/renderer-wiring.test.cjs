@@ -49,6 +49,14 @@ test("closing the launcher follows the persisted background-runtime preference",
   assert.match(appSource, /setPreference\("keepRunningOnClose", checked\)/);
 });
 
+test("ChatGPT browser workarounds have a persisted renderer setting", () => {
+  assert.match(appSource, /disableChatGptBrowserWorkarounds/);
+  assert.match(appSource, /setPreference\("disableChatGptBrowserWorkarounds", checked\)/);
+  assert.match(electronMain, /key === "disableChatGptBrowserWorkarounds"/);
+  assert.match(browserHostSource, /disableChatGptBrowserWorkarounds/);
+  assert.match(browserHostSource, /applyViewportCss\(contents, tab\)/);
+});
+
 test("normal shutdown persists the ChatGPT session before closing browser views", () => {
   assert.match(
     electronMain,

@@ -105,6 +105,38 @@ test("sidebar request blocking is limited to launcher-owned ChatGPT web contents
   }), false);
 });
 
+test("sidebar request blocking can be disabled with the browser workaround preference", () => {
+  const fixture = Object.assign(Object.create(BrowserHost.prototype), {
+    getPreferences: () => ({ disableChatGptBrowserWorkarounds: true }),
+    view: { webContents: { id: 11 } },
+    turnTabs: new Map(),
+  });
+  assert.equal(fixture.shouldBlockChatGptBackgroundRequest({
+    url: "https://chatgpt.com/backend-api/conversations?offset=0",
+    webContentsId: 11,
+  }), false);
+});
+
+test("browser workaround CSS can be removed without a reload", async () => {
+  const calls = [];
+  const contents = {
+    isDestroyed: () => false,
+    removeInsertedCSS: async key => calls.push(["remove", key]),
+    insertCSS: async () => calls.push(["insert"]) && "new-css-key",
+  };
+  const fixture = Object.assign(Object.create(BrowserHost.prototype), {
+    getPreferences: () => ({ disableChatGptBrowserWorkarounds: true }),
+    view: { webContents: contents },
+    turnTabs: new Map(),
+    viewportCssKey: "old-css-key",
+  });
+
+  await fixture.applyViewportCss();
+
+  assert.deepEqual(calls, [["remove", "old-css-key"]]);
+  assert.equal(fixture.viewportCssKey, null);
+});
+
 test("the idle home browser performs one bounded reload for a Cloudflare challenge burst", async () => {
   const calls = [];
   const fixture = Object.assign(Object.create(BrowserHost.prototype), {

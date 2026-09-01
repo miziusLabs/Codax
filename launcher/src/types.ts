@@ -11,6 +11,7 @@ export interface LauncherState {
   autoStart: boolean;
   keepRunningOnClose: boolean;
   showBrowserDuringTurns: boolean;
+  disableChatGptBrowserWorkarounds: boolean;
   experimentalBiggerContext: boolean;
   sidebarOpen: boolean;
   sidebarWidth: number;
@@ -134,7 +135,7 @@ export interface LauncherApi {
   setAutostart(enabled: boolean): Promise<{ state: LauncherState; supported: boolean; enabled: boolean }>;
   setBiggerContext(enabled: boolean): Promise<LauncherState>;
   setPreference(
-    key: "keepRunningOnClose" | "showBrowserDuringTurns",
+    key: "keepRunningOnClose" | "showBrowserDuringTurns" | "disableChatGptBrowserWorkarounds",
     value: boolean,
   ): Promise<LauncherState>;
   setSidebarState(state: { open: boolean; width: number }): Promise<LauncherState>;
