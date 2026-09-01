@@ -281,27 +281,38 @@ async function configureTunnel(config: AppConfig, existing: AppConfig | undefine
   });
 }
 
+export function tunnelBootstrapCleanupRequired(
+  validationSucceeded: boolean,
+  platform = process.platform,
+): boolean {
+  return !validationSucceeded || platform !== "win32";
+}
+
 async function bootstrapTunnelProfile(config: AppConfig): Promise<void> {
   let bootstrapError: unknown;
   try {
     // `runtimes connect` writes the native profile and returns once its managed runtime is healthy.
     // Readiness follows after a successful control-plane poll, so setup proves it separately before
-    // stopping the validation runtime. The launcher supervisor reconnects the committed profile.
+    // handing ownership to the launcher supervisor. On Windows, tunnel-client 0.0.12's stop command
+    // removes the profile and health marker while its PowerShell-managed child can remain alive. Keep
+    // a successful validation runtime intact there so the supervisor can adopt it directly.
     connectTunnel(config);
     const status = await waitForTunnelReady(config);
     if (!status.ok) throw new Error(`Tunnel runtime did not become healthy and ready: ${status.detail}`);
   } catch (error) {
     bootstrapError = error;
   }
-  try {
-    stopTunnel(config);
-  } catch (stopError) {
-    if (bootstrapError) {
-      const primary = bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError);
-      const cleanup = stopError instanceof Error ? stopError.message : String(stopError);
-      throw new Error(`${primary}; temporary tunnel cleanup also failed: ${cleanup}`);
+  if (tunnelBootstrapCleanupRequired(bootstrapError === undefined)) {
+    try {
+      stopTunnel(config);
+    } catch (stopError) {
+      if (bootstrapError) {
+        const primary = bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError);
+        const cleanup = stopError instanceof Error ? stopError.message : String(stopError);
+        throw new Error(`${primary}; temporary tunnel cleanup also failed: ${cleanup}`);
+      }
+      throw stopError;
     }
-    throw stopError;
   }
   if (bootstrapError) throw bootstrapError;
 }

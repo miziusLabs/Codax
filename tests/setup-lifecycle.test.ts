@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test";
-import { launcherCapabilityProbeRequired, setupProxyIsReady } from "../src/setup";
+import {
+  launcherCapabilityProbeRequired,
+  setupProxyIsReady,
+  tunnelBootstrapCleanupRequired,
+} from "../src/setup";
 
 const config = {
   mode: "browser-only" as const,
@@ -35,4 +39,16 @@ test("launcher setup refreshes account capabilities only when missing or explici
     proAvailable: false,
   } as never)).toBe(true);
   expect(launcherCapabilityProbeRequired(verifiedLauncher, true)).toBe(true);
+});
+
+test("Windows hands a successfully validated tunnel directly to the launcher supervisor", () => {
+  expect(tunnelBootstrapCleanupRequired(true, "win32")).toBe(false);
+  expect(tunnelBootstrapCleanupRequired(true, "darwin")).toBe(true);
+  expect(tunnelBootstrapCleanupRequired(true, "linux")).toBe(true);
+});
+
+test("failed tunnel validation is cleaned up on every platform", () => {
+  expect(tunnelBootstrapCleanupRequired(false, "win32")).toBe(true);
+  expect(tunnelBootstrapCleanupRequired(false, "darwin")).toBe(true);
+  expect(tunnelBootstrapCleanupRequired(false, "linux")).toBe(true);
 });
