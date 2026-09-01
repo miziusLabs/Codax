@@ -158,19 +158,13 @@ describe("ChatGPT Web model routing", () => {
     });
   });
 
-  test("Bigger Context can expand browser transport without changing the retained Sol model limit", () => {
-    expect(resolveChatGptWebContextLimits(CHATGPT_WEB_BACKEND_MODEL, "max", {
-      ...pro,
-      experimentalBiggerContext: true,
-    })).toEqual({
-      contextWindow: 272_000,
-      effectiveContextWindowPercent: 90,
-      autoCompactTokenLimit: 244_800,
+  test("keeps one-message browser transport separate from retained Sol model headroom", () => {
+    expect(resolveChatGptWebContextLimits(CHATGPT_WEB_BACKEND_MODEL, "max", pro)).toEqual({
+      contextWindow: 112_193,
+      effectiveContextWindowPercent: 85,
+      autoCompactTokenLimit: 95_000,
     });
-    expect(resolveChatGptWebModelContextLimits(CHATGPT_WEB_BACKEND_MODEL, "max", {
-      ...pro,
-      experimentalBiggerContext: true,
-    })).toEqual({
+    expect(resolveChatGptWebModelContextLimits(CHATGPT_WEB_BACKEND_MODEL, "max", pro)).toEqual({
       contextWindow: 272_000,
       effectiveContextWindowPercent: 90,
       autoCompactTokenLimit: 244_800,
@@ -178,7 +172,6 @@ describe("ChatGPT Web model routing", () => {
     expect(resolveChatGptWebContextLimits(CHATGPT_WEB_LUNA_BACKEND_MODEL, "low", {
       solAvailable: false,
       proAvailable: false,
-      experimentalBiggerContext: true,
     })).toEqual({
       contextWindow: 1_050_000,
       effectiveContextWindowPercent: 100,

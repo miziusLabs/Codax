@@ -47,7 +47,6 @@ export const CHATGPT_WEB_PRO_MODEL_COMPOSER_CHAR_LIMIT = 1_635_000;
  * before later browser turns are compiled.
  */
 export const CHATGPT_WEB_LUNA_CHECKPOINT_TASK_WINDOW = 1_050_000;
-export const CHATGPT_WEB_BIGGER_CONTEXT_MULTIPLIER = 3;
 
 export interface ChatGptWebContextLimits {
   contextWindow: number;
@@ -117,15 +116,7 @@ export function resolveChatGptWebContextLimits(
   } else {
     throw new Error(`ChatGPT Plus context limit is not defined for unavailable effort: ${effort}`);
   }
-  if (!capabilities.experimentalBiggerContext) return limits;
-  const actualModelWindow = modelContextWindow(backendModel);
-  return contextLimits(
-    Math.min(limits.contextWindow * CHATGPT_WEB_BIGGER_CONTEXT_MULTIPLIER, actualModelWindow),
-    Math.min(
-      limits.autoCompactTokenLimit * CHATGPT_WEB_BIGGER_CONTEXT_MULTIPLIER,
-      maxModelAutoCompactTokenLimit(actualModelWindow),
-    ),
-  );
+  return limits;
 }
 
 /**
@@ -193,7 +184,6 @@ export interface ChatGptWebModelRoute {
 export interface ChatGptWebAccountCapabilities {
   solAvailable: boolean;
   proAvailable: boolean;
-  experimentalBiggerContext?: boolean;
 }
 
 export const CHATGPT_WEB_LUNA_MODEL_ROUTE: ChatGptWebModelRoute = {

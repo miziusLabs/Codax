@@ -81,10 +81,9 @@ describe("native /models augmentation", () => {
     expect(model).not.toHaveProperty("comp_hash");
   });
 
-  test("publishes Bigger Context compaction headroom without inflating the model window", () => {
+  test("publishes retained Sol compaction headroom independently of browser message limits", () => {
     const config = defaultConfig("full");
     config.proAvailable = true;
-    config.experimentalBiggerContext = true;
     const models = augmentNativeModelCatalog(source(), config).models as Array<Record<string, unknown>>;
     const pro = models.find(model => model.slug === "chatgpt-web/gpt-5.6-sol")!;
     expect(pro.context_window).toBe(272_000);

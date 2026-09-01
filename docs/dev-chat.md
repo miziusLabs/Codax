@@ -82,19 +82,14 @@ it to exercise the one-message composer budget and multi-chunk prompt insertion 
 history growth. The normal model-specific browser preflight still applies and fails closed above
 the measured transport limit.
 
-## Bigger Context experiment
+## Automatic multipart context transport
 
-Both launcher profiles expose **Bigger Context (experimental)** in Settings. It is disabled by
-default. The switch updates the profile's canonical runtime configuration through the normal setup
-transaction; it is not a launcher-only preference. Production setup also rewrites the managed
-Codex model catalog with 3x context and auto-compaction thresholds and asks you to restart Codex.
-The DEV CLI reads the same setting from its isolated runtime configuration on each command.
-
-When enabled, a normal turn stays on the original single-message path while its estimated input
-is below the selected mode's existing auto-compaction threshold. At the first threshold it uses two
-messages; at twice that threshold it uses three messages. The final context part also commits the
-transaction and starts the task, so there is no extra request. The existing DEV compaction threshold
-remains three times the selected mode's base limit.
+Sol turns stay on the normal single-message path while their estimated input is below the selected
+mode's browser threshold. At the first threshold the bridge automatically uses two messages; at
+twice that threshold it uses three. There is no separate launcher setting or runtime preference.
+The final context part also commits the transaction and starts the task, so staging adds no fourth
+"start work" message. Codex continues to use the retained Sol model window and its normal model-level
+auto-compaction threshold independently of the browser's one-message transport limit.
 
 Each stage contains complete semantic records, never a raw JSON string cut in the middle. The model
 must return an exact transaction-bound SHA-256 acknowledgement before the next part is sent.
@@ -112,15 +107,14 @@ has no retained MCP boundary and keeps the three-message compaction path so its 
 the complete expanded history.
 
 Any missing or malformed acknowledgement fails the whole transaction. No later part or final
-commit is sent, and a retry starts again from part one in a fresh Temporary Chat. The model context
-and auto-compaction ceilings are reported as 3× while the switch is active, but every individual
+commit is sent, and a retry starts again from part one in a fresh Temporary Chat. Every individual
 stage must still fit the selected ChatGPT mode's measured one-message boundary.
 
-Small turns add no requests. Two-part turns add two staging requests and acknowledgements; three-part
-turns add three. Browser-only compaction also uses three stages. Large turns are therefore slower and may increase the probability of
-rate limits or a temporary account cooldown. The experiment is intentionally unavailable for Luna:
-Luna's later requests still include the accumulated transcript inside the same measured
-28,000-token browser transport budget.
+Small turns add no requests. A two-part transaction adds one acknowledgement turn before the final
+commit; a three-part transaction adds two. Browser-only compaction also uses three parts. Large turns
+are therefore slower and may increase the probability of rate limits or a temporary account cooldown.
+Multipart staging is unavailable for Luna because Luna's later requests still include the accumulated
+transcript inside the same measured 28,000-token browser transport budget.
 
 Browser-only chats do not advertise outer tools and never claim simulated effects. Full setup keeps
 the launcher-owned DEV tunnel ready so ChatGPT can create and validate `Codex Native2 DEV` before a

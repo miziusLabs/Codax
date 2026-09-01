@@ -603,7 +603,7 @@ test("adapter compact rebuilds canonical Codex history after the source response
     expect(turn.requireRetainedConversation).toBeUndefined();
     expect(turn.nativeConnector).toBeUndefined();
     expect(turn.capabilities.localToolsEnabled).toBeFalse();
-    expect(prepared.text).toContain("Original task");
+    expect(prepared.multipart?.parts.join("\n") ?? prepared.text).toContain("Original task");
     prepared.release();
     return "Adapter canonical checkpoint";
   };
@@ -764,8 +764,9 @@ test("structured compact rebuilds canonical context when its retained source is 
     expect(turn.conversationKey).toBeUndefined();
     expect(turn.compaction).toBeTrue();
     const prepared = await turn.prepare();
-    expect(prepared.text).toContain("Original task");
-    expect(prepared.text).toContain("Continue with the next step");
+    const preparedContext = prepared.multipart?.parts.join("\n") ?? prepared.text;
+    expect(preparedContext).toContain("Original task");
+    expect(preparedContext).toContain("Continue with the next step");
     prepared.release();
     return "Fallback checkpoint from canonical Codex context";
   };
@@ -827,7 +828,7 @@ test("structured compact rebuilds canonical context directly after a completed s
     expect(turn.requireRetainedConversation).toBeUndefined();
     expect(turn.conversationKey).toBeUndefined();
     const prepared = await turn.prepare();
-    expect(prepared.text).toContain("Original task");
+    expect(prepared.multipart?.parts.join("\n") ?? prepared.text).toContain("Original task");
     prepared.release();
     return "Fallback checkpoint after retained browser loss";
   };

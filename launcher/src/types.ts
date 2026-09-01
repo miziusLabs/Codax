@@ -12,7 +12,6 @@ export interface LauncherState {
   keepRunningOnClose: boolean;
   showBrowserDuringTurns: boolean;
   disableChatGptBrowserWorkarounds: boolean;
-  experimentalBiggerContext: boolean;
   sidebarOpen: boolean;
   sidebarWidth: number;
   browserSmokePassed?: boolean;
@@ -133,7 +132,6 @@ export interface LauncherApi {
   }): Promise<{ ok: boolean; stdout: string }>;
   setMcpStep(step: number): Promise<LauncherState>;
   setAutostart(enabled: boolean): Promise<{ state: LauncherState; supported: boolean; enabled: boolean }>;
-  setBiggerContext(enabled: boolean): Promise<LauncherState>;
   setPreference(
     key: "keepRunningOnClose" | "showBrowserDuringTurns" | "disableChatGptBrowserWorkarounds",
     value: boolean,

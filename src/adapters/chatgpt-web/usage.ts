@@ -48,17 +48,15 @@ export function estimateChatGptWebInputTokens(
 }
 
 /**
- * Use the existing model/account compaction threshold as the size of one context part. Normal
- * turns stay on the original one-message transport until they actually need the experiment;
- * compaction itself always receives all three parts so it can summarize the expanded window.
+ * Use the existing model/account browser threshold as the size of one context part. Normal turns
+ * stay on the one-message transport until the compiled context needs staging; compaction receives
+ * all three parts so it can summarize the complete retained Sol window.
  */
 export function resolveBiggerContextMultipartParts(
   parsed: CodexParsedRequest,
   capabilities: ChatGptWebCapabilities,
 ): ChatGptWebMultipartPartCount | undefined {
-  if (parsed.modelId === CHATGPT_WEB_LUNA_MODEL_ID) {
-    throw new Error("Bigger Context is unavailable for Luna because its accumulated browser transcript still shares one 28,000-token transport budget");
-  }
+  if (parsed.modelId === CHATGPT_WEB_LUNA_MODEL_ID) return undefined;
   const mode = resolveChatGptWebModelMode(parsed.modelId, parsed.options.reasoning, capabilities);
 
   const onePartLimit = resolveChatGptWebContextLimits(

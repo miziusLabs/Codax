@@ -516,12 +516,12 @@ export function assertChatGptWebMultipartInputWithinLimits(
 ): void {
   if (modelId === CHATGPT_WEB_LUNA_MODEL_ID) {
     throw new ChatGptWebAdapterError(
-      "Bigger Context is unavailable for Luna because every later browser request includes the accumulated transcript inside the same 28,000-token transport budget.",
+      "Multipart context transport is unavailable for Luna because every later browser request includes the accumulated transcript inside the same 28,000-token transport budget.",
       { status: 400, errorType: "invalid_request_error", code: "context_length_exceeded", retryable: false },
     );
   }
   if (modelId !== CHATGPT_WEB_MODEL_ID) {
-    throw new Error(`ChatGPT Bigger Context limit is not defined for model: ${modelId}`);
+    throw new Error(`ChatGPT multipart context limit is not defined for model: ${modelId}`);
   }
   const { contextWindow } = resolveChatGptWebContextLimits(modelId, effort, capabilities);
   const assertMessageBoundary = (
@@ -537,13 +537,13 @@ export function assertChatGptWebMultipartInputWithinLimits(
     );
     if (browserComposerCharLimit !== undefined && messageChars > browserComposerCharLimit) {
       throw new ChatGptWebAdapterError(
-        `A Bigger Context ${label} contains ${messageChars.toLocaleString("en-US")} characters, which exceeds the measured ${browserComposerCharLimit.toLocaleString("en-US")}-character ChatGPT composer boundary. The bridge will not split an individual Codex message or JSON record; compact the task before retrying.`,
+        `A multipart context ${label} contains ${messageChars.toLocaleString("en-US")} characters, which exceeds the measured ${browserComposerCharLimit.toLocaleString("en-US")}-character ChatGPT composer boundary. The bridge will not split an individual Codex message or JSON record; compact the task before retrying.`,
         { status: 400, errorType: "invalid_request_error", code: "context_length_exceeded", retryable: false },
       );
     }
     if (browserMessageTokenLimit !== undefined && messageTokens > browserMessageTokenLimit) {
       throw new ChatGptWebAdapterError(
-        `A Bigger Context ${label} requires ${messageTokens.toLocaleString("en-US")} visible message tokens, which exceeds the measured ${browserMessageTokenLimit.toLocaleString("en-US")}-token ChatGPT message boundary. The bridge will not split an individual Codex message or JSON record; compact the task before retrying.`,
+        `A multipart context ${label} requires ${messageTokens.toLocaleString("en-US")} visible message tokens, which exceeds the measured ${browserMessageTokenLimit.toLocaleString("en-US")}-token ChatGPT message boundary. The bridge will not split an individual Codex message or JSON record; compact the task before retrying.`,
         { status: 400, errorType: "invalid_request_error", code: "context_length_exceeded", retryable: false },
       );
     }
@@ -568,7 +568,7 @@ export function assertChatGptWebMultipartInputWithinLimits(
   if (estimatedInputTokens < experimentalContextWindow) return;
   const partLabel = partCount === 2 ? "two-part" : "three-part";
   throw new ChatGptWebAdapterError(
-    `This Bigger Context transaction is estimated at ${estimatedInputTokens.toLocaleString("en-US")} input tokens, which exceeds its experimental ${experimentalContextWindow.toLocaleString("en-US")}-token ${partLabel} ceiling. Run /compact, then retry.`,
+    `This multipart context transaction is estimated at ${estimatedInputTokens.toLocaleString("en-US")} input tokens, which exceeds its ${experimentalContextWindow.toLocaleString("en-US")}-token ${partLabel} transport ceiling. Run /compact, then retry.`,
     { status: 400, errorType: "invalid_request_error", code: "context_length_exceeded", retryable: false },
   );
 }
@@ -583,12 +583,12 @@ export function resolveChatGptWebMultipartStagingMode(
 ): ChatGptWebModelMode {
   if (modelId === CHATGPT_WEB_LUNA_MODEL_ID || !capabilities.solAvailable) {
     throw new ChatGptWebAdapterError(
-      "Bigger Context staging is unavailable for a Luna-only account.",
+      "Multipart context staging is unavailable for a Luna-only account.",
       { status: 400, errorType: "invalid_request_error", code: "context_length_exceeded", retryable: false },
     );
   }
   if (modelId !== CHATGPT_WEB_MODEL_ID) {
-    throw new Error(`ChatGPT Bigger Context staging mode is not defined for model: ${modelId}`);
+    throw new Error(`ChatGPT multipart staging mode is not defined for model: ${modelId}`);
   }
   const efforts: readonly ChatGptWebModelMode["effort"][] = capabilities.proAvailable
     ? ["low", "medium", "max"]
@@ -610,7 +610,7 @@ export function resolveChatGptWebMultipartStagingMode(
     if (tokenFits && charsFit) return mode;
   }
   throw new ChatGptWebAdapterError(
-    `No ChatGPT effort available to this account can carry a Bigger Context stage with ${maxStageMessageTokens.toLocaleString("en-US")} estimated tokens and ${maxStageChars.toLocaleString("en-US")} characters.`,
+    `No ChatGPT effort available to this account can carry a multipart context stage with ${maxStageMessageTokens.toLocaleString("en-US")} estimated tokens and ${maxStageChars.toLocaleString("en-US")} characters.`,
     { status: 400, errorType: "invalid_request_error", code: "context_length_exceeded", retryable: false },
   );
 }
@@ -2369,7 +2369,7 @@ export class ChatGptBrowserWorker {
         throw new DOMException("ChatGPT multipart stage aborted", "AbortError");
       }
       if (deadline !== undefined && Date.now() >= deadline) {
-        throw new Error("ChatGPT Bigger Context transaction timed out while awaiting a stage acknowledgement");
+        throw new Error("ChatGPT multipart context transaction timed out while awaiting a stage acknowledgement");
       }
       await throwIfChatGptSessionFailureAlert(page);
       await throwIfChatGptTerminalErrorAlert(responseTurn.locator);
@@ -2404,7 +2404,7 @@ export class ChatGptBrowserWorker {
         const actual = snapshot.visibleText.trim();
         if (actual !== stage.acknowledgement) {
           throw new ChatGptWebAdapterError(
-            `ChatGPT Bigger Context stage returned ${actual.length.toLocaleString("en-US")} characters instead of its exact acknowledgement. The staged task was not committed and will not be retried automatically.`,
+            `ChatGPT multipart context stage returned ${actual.length.toLocaleString("en-US")} characters instead of its exact acknowledgement. The staged task was not committed and will not be retried automatically.`,
             {
               status: 502,
               errorType: "server_error",

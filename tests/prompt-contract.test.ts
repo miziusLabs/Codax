@@ -95,7 +95,7 @@ test("read-only prompts resume without exposing a bind capability", () => {
   expect(compiled.text).not.toContain("CODEX_INTERNAL_CONTEXT_COMPACT");
 });
 
-test("Bigger Context sends three semantic record envelopes and starts work from the final part", () => {
+test("multipart context sends three semantic record envelopes and starts work from the final part", () => {
   const token = "turn_12345678901234567890123456789012";
   const parsed = request("high");
   parsed.context.systemPrompt = ["system-one", "system-two"];
@@ -155,7 +155,7 @@ test("Bigger Context sends three semantic record envelopes and starts work from 
   expect(commit.match(new RegExp(token, "g"))).toHaveLength(1);
 });
 
-test("Bigger Context uses the minimum transport and reserves three stages for compaction", () => {
+test("multipart context uses the minimum transport and reserves three parts for compaction", () => {
   expect(biggerContextPartCount(94_999, 95_000, false)).toBeUndefined();
   expect(biggerContextPartCount(95_000, 95_000, false)).toBe(2);
   expect(biggerContextPartCount(189_999, 95_000, false)).toBe(2);
@@ -251,7 +251,7 @@ test("Web compaction trims only the oldest history until the browser request fit
   expect(untrimmed.trimmedCompactionMessages).toBeUndefined();
 });
 
-test("Bigger Context compaction preserves history above the retired inline byte budget", () => {
+test("multipart context compaction preserves history above the retired inline byte budget", () => {
   const compact = request("high");
   compact._compactionRequest = true;
   compact.context.systemPrompt = [];

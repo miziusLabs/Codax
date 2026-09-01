@@ -1713,7 +1713,7 @@ test("browser preflight separates model context from one-message transport limit
   )).toThrow("104,000-token ChatGPT browser message boundary");
 });
 
-test("Bigger Context preflight expands only the total context ceiling and keeps each message boundary", () => {
+test("multipart preflight expands only the total transport ceiling and keeps each message boundary", () => {
   const pro = { localToolsEnabled: false, solAvailable: true, proAvailable: true };
   expect(() => assertChatGptWebMultipartInputWithinLimits(
     280_000,
@@ -1732,7 +1732,7 @@ test("Bigger Context preflight expands only the total context ceiling and keeps 
     pro,
     900_000,
     3,
-  )).toThrow("three-part ceiling");
+  )).toThrow("three-part transport ceiling");
   expect(() => assertChatGptWebMultipartInputWithinLimits(
     222_386,
     95_000,
@@ -1741,7 +1741,7 @@ test("Bigger Context preflight expands only the total context ceiling and keeps 
     pro,
     900_000,
     2,
-  )).toThrow("two-part ceiling");
+  )).toThrow("two-part transport ceiling");
   expect(() => assertChatGptWebMultipartInputWithinLimits(
     280_000,
     103_001,
@@ -1762,7 +1762,7 @@ test("Bigger Context preflight expands only the total context ceiling and keeps 
   )).toThrow("unavailable for Luna");
 });
 
-test("Bigger Context stages use the lowest account mode that can carry the stage", () => {
+test("multipart stages use the lowest account mode that can carry the stage", () => {
   const plus = { localToolsEnabled: false, solAvailable: true, proAvailable: false };
   const pro = { localToolsEnabled: false, solAvailable: true, proAvailable: true };
   expect(resolveChatGptWebMultipartStagingMode("gpt-5.6-sol", plus, "medium", 30_000, 200_000).effort).toBe("medium");

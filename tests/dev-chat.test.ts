@@ -116,8 +116,8 @@ test("new DEV chats default to the cheapest account-supported browser model", ()
   expect(defaultDevChatModel({ ...defaultConfig("full"), solAvailable: false })).toBe("chatgpt-web/luna");
 });
 
-test("DEV compaction follows retained Sol model headroom and Bigger Context stays transport-only", async () => {
-  const root = scratch("cgw-dev-bigger-context");
+test("DEV compaction follows retained Sol model headroom while browser staging stays transport-only", async () => {
+  const root = scratch("cgw-dev-multipart-context");
   const config = {
     ...defaultConfig("browser-only"),
     purpose: "dev-harness" as const,
@@ -125,7 +125,7 @@ test("DEV compaction follows retained Sol model headroom and Bigger Context stay
     proAvailable: true,
   };
   const factory = (): ProviderAdapter => ({
-    name: "dev-bigger-context-test",
+    name: "dev-multipart-context-test",
     async runTurn(_parsed, _incoming, emit) {
       emit({ type: "text_delta", text: "unused", phase: "final_answer" });
       emit({
@@ -141,23 +141,13 @@ test("DEV compaction follows retained Sol model headroom and Bigger Context stay
     autoCompactTokenLimit: 244_800,
     contextWindow: 272_000,
   });
-
-  const biggerConfig = { ...config, experimentalBiggerContext: true };
-  const bigger = new DevChatDriver(biggerConfig, store, factory, root, { biggerContext: true });
-  const biggerState = bigger.open("bigger-window", "chatgpt-web/gpt-5.6-sol").state;
-  const biggerStatus = bigger.status(biggerState);
-  expect(biggerStatus).toMatchObject({
-    autoCompactTokenLimit: 244_800,
-    contextWindow: 272_000,
-  });
-  expect(biggerStatus.percent).toBe(Math.round((biggerStatus.inputTokens / 244_800) * 1_000) / 10);
   const luna = new DevChatDriver({
-    ...biggerConfig,
+    ...config,
     solAvailable: false,
     proAvailable: false,
-  }, store, factory, root, { biggerContext: true });
-  expect(() => luna.open("luna-window", "chatgpt-web/luna")).toThrow("unavailable for Luna");
-  await Promise.all([normal.close(), bigger.close(), luna.close()]);
+  }, store, factory, root);
+  expect(luna.open("luna-window", "chatgpt-web/luna").state.model).toBe("chatgpt-web/luna");
+  await Promise.all([normal.close(), luna.close()]);
 });
 
 test("browser-only DEV driver runs real turns without advertising simulated tools", async () => {

@@ -76,27 +76,13 @@ test("DEV launcher exposes its profile and supervises only its Full-mode MCP run
   assert.match(electronMain, /onboardingComplete:\s*true,[\s\S]*?autoStart:\s*false/);
   assert.match(appSource, /snapshot\.profile === "development"/);
   assert.match(appSource, /data-profile=\{snapshot\.profile\}/);
-  assert.match(appSource, /<SettingRow body=\{copy\.biggerContextBody\} label=\{copy\.biggerContext\}>/);
-  assert.match(appSource, /api!\.setBiggerContext\(enabled\)/);
-  assert.match(electronMain, /runtimeHost\.setBiggerContext\(enabled === true\)/);
-  assert.doesNotMatch(electronMain, /IS_DEV_PROFILE && key === "experimentalBiggerContext"/);
+  assert.doesNotMatch(appSource, /biggerContext|setBiggerContext|experimentalBiggerContext/);
+  assert.doesNotMatch(electronMain, /bigger-context|setBiggerContext|experimentalBiggerContext/);
 });
 
-test("Bigger Context startup recommendation reuses the persisted setting and setup transaction", () => {
-  assert.match(
-    appSource,
-    /const \[biggerContextRecommendationOpen, setBiggerContextRecommendationOpen\] = useState\(\s*snapshot\.state\.coreSetupComplete === true && !snapshot\.state\.experimentalBiggerContext,/,
-  );
-  assert.match(appSource, /&& !biggerContextRecommendationOpen;/);
-  assert.match(appSource, /updateState\(await api!\.setBiggerContext\(enabled\)\)/);
-  assert.match(
-    appSource,
-    /<BiggerContextRecommendation[\s\S]*?checked=\{snapshot\.state\.experimentalBiggerContext\}[\s\S]*?onClose=\{\(\) => setBiggerContextRecommendationOpen\(false\)\}/,
-  );
-  assert.match(appSource, /<Switch checked=\{checked\} disabled=\{busy\} onChange=\{onChange\} \/>/);
-  assert.match(stylesSource, /\.bigger-context-recommendation-backdrop\s*\{[^}]*position:\s*fixed;/s);
-  assert.doesNotMatch(stylesSource, /\.bigger-context-recommendation-backdrop\s*\{[^}]*backdrop-filter:/s);
-  assert.match(stylesSource, /\.bigger-context-recommendation\s*\{[^}]*width:\s*min\(400px, 100%\);[^}]*padding:\s*18px;/s);
+test("automatic multipart context has no launcher setting or recommendation surface", () => {
+  assert.doesNotMatch(appSource, /BiggerContextRecommendation|bigger-context-recommendation/);
+  assert.doesNotMatch(stylesSource, /bigger-context-recommendation/);
 });
 
 test("MCP surfaces use the official local protocol mark", () => {

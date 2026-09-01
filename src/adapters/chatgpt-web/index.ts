@@ -238,10 +238,6 @@ export function createChatGptWebAdapter(
   const broker = dependencies.broker ?? TurnBroker.forSocket(brokerSocketPath(provider));
   const structuredBroker = broker instanceof TurnBroker ? broker : undefined;
   const timeoutMs = provider.chatgptWeb?.turnTimeoutMs;
-  const experimentalBiggerContext = provider.chatgptWeb?.experimentalBiggerContext;
-  if (experimentalBiggerContext !== undefined && typeof experimentalBiggerContext !== "boolean") {
-    throw new Error("ChatGPT Bigger Context preference must be a boolean");
-  }
   const configuredCapabilities: ChatGptWebCapabilities = {
     localToolsEnabled: provider.chatgptWeb?.localToolsEnabled === true,
     solAvailable: provider.chatgptWeb?.solAvailable !== false,
@@ -289,9 +285,7 @@ export function createChatGptWebAdapter(
       ? chatGptConversationKey(checkpointInput.parsed, executionNamespace)
       : undefined;
     const compileOptionsFor = (input: CodexParsedRequest) => {
-      const experimentalMultipartParts = experimentalBiggerContext
-        ? resolveBiggerContextMultipartParts(input, turnCapabilities)
-        : undefined;
+      const experimentalMultipartParts = resolveBiggerContextMultipartParts(input, turnCapabilities);
       return {
         captureLunaCheckpoint,
         ...(experimentalMultipartParts !== undefined

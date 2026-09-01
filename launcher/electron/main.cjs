@@ -630,17 +630,6 @@ function registerIpc({ logger, stateStore }) {
       ...autostart,
     };
   });
-  handle("launcher:bigger-context", async (_event, enabled) => {
-    const result = await runtimeHost.setBiggerContext(enabled === true);
-    const state = stateStore.update({
-      experimentalBiggerContext: result.enabled,
-      codexCatalogVerified: IS_DEV_PROFILE ? true : false,
-      codexRestartRequired: IS_DEV_PROFILE ? false : true,
-    });
-    send("launcher:state-changed", state);
-    if (!IS_DEV_PROFILE) startCatalogVerificationMonitor({ logger, stateStore });
-    return state;
-  });
   handle("launcher:set-preference", async (_event, key, value) => {
     const ordinary = key === "keepRunningOnClose"
       || key === "showBrowserDuringTurns"
@@ -890,7 +879,6 @@ async function start() {
       ...(config?.mode !== "full" ? { mcpSetupComplete: false, mcpGuideStep: 0 } : {}),
       codexRestartRequired: false,
       autoStart: false,
-      experimentalBiggerContext: config?.experimentalBiggerContext === true,
     });
     send("launcher:state-changed", state);
     logger.info("dev_profile.ready", {
@@ -915,7 +903,6 @@ async function start() {
         coreSetupComplete: true,
         codexCatalogVerified: false,
         codexRestartRequired: true,
-        experimentalBiggerContext: runtimeHost.runtimeConfigSnapshot().config?.experimentalBiggerContext === true,
         ...(upgrade.mode === "full" ? {
           mcpRuntimeInstalled: true,
           mcpSetupComplete: false,
@@ -934,14 +921,6 @@ async function start() {
         connectorMigrated: upgrade.connectorMigrated,
       });
     }
-    const configuredRuntime = runtimeHost.runtimeConfigSnapshot();
-    if (configuredRuntime.configured) {
-      const enabled = configuredRuntime.config?.experimentalBiggerContext === true;
-      if (stateStore.read().experimentalBiggerContext !== enabled) {
-        const state = stateStore.update({ experimentalBiggerContext: enabled });
-        send("launcher:state-changed", state);
-      }
-    }
     const runtime = await runtimeSupervisor.startIfConfigured();
     if (runtime.status !== "ready") return runtime;
     const route = await runtimeHost.connectBridgeRoute();
@@ -953,7 +932,6 @@ async function start() {
       const patch = {
         coreSetupComplete: true,
         mcpRuntimeInstalled: config.mode === "full",
-        experimentalBiggerContext: config.experimentalBiggerContext === true,
         ...(runtime.bridgeRouteChanged ? {
           codexCatalogVerified: false,
           codexRestartRequired: true,

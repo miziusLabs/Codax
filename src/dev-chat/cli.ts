@@ -23,7 +23,6 @@ import { startDevChatTransport } from "./transport";
 import {
   activateDevProfileEnvironment,
   launchDevProfile,
-  readDevChatExperimentalFeatures,
   resolveDevProfilePaths,
 } from "./profile";
 import { DEV_CONFIG_PURPOSE, DEV_LAUNCHER_PROFILE } from "./constants";
@@ -52,9 +51,6 @@ Interactive commands:
   /reset yes           Clear this named DEV chat and create a new thread identity
   /help                Show this command list
   /exit                Exit
-
-Experimental settings:
-  Bigger Context       Enable in Settings; adapts context across 1, 2, or 3 messages
 `;
 
 function takeFlag(args: string[], name: string): boolean {
@@ -148,14 +144,10 @@ function printHeader(
   created: boolean,
   status: DevContextStatus,
   mode: "browser-only" | "full",
-  biggerContext: boolean,
 ): void {
   stdout.write(`${bold("Codex Web GPT DEV")} · ${created ? "created" : "continued"} chat ${cyan(state.name)}\n`);
   stdout.write(`model ${state.model} · ${mode === "full" ? "tools explicitly simulated" : "browser-only, no outer tools"} · live launcher browser\n`);
   stdout.write(`context ${statusLine(status)}\n`);
-  if (biggerContext) {
-    stdout.write(`${yellow("Bigger Context experimental")} · adaptive 1/2/3-message context · same-agent compaction handoff · elevated rate-limit/cooldown risk\n`);
-  }
   stdout.write(`${dim("Codex route is untouched. No Responses port is bound, replaced, stopped, or restarted.")}\n`);
 }
 
@@ -313,15 +305,13 @@ export async function runDevCommand(args: string[]): Promise<void> {
         config = { configured: false, error: error instanceof Error ? error.message : String(error) };
       }
     }
-    const features = readDevChatExperimentalFeatures(paths);
-    const status = { paths, launcher, config, mcpRuntime, features };
+    const status = { paths, launcher, config, mcpRuntime };
     if (json) stdout.write(`${JSON.stringify(status, null, 2)}\n`);
     else {
       stdout.write(`DEV home: ${paths.home}\n`);
       stdout.write(`launcher: ${launcher.running ? `running (pid ${launcher.pid})` : `not ready${launcher.error ? ` · ${launcher.error}` : ""}`}\n`);
       stdout.write(`config: ${config.configured ? `${config.mode} (${config.purpose})` : `not ready${config.error ? ` · ${config.error}` : ""}`}\n`);
       stdout.write(`MCP runtime: ${mcpRuntime.required ? (mcpRuntime.ready ? "ready" : `not ready${mcpRuntime.detail ? ` · ${mcpRuntime.detail}` : ""}`) : "not required"}\n`);
-      stdout.write(`Bigger Context: ${features.biggerContext ? "enabled (experimental, adaptive 1/2/3 messages; same-agent compaction handoff)" : "disabled"}\n`);
       stdout.write("Codex route: isolated and unused\nResponses listener: not started\n");
     }
     return;
@@ -337,18 +327,12 @@ export async function runDevCommand(args: string[]): Promise<void> {
     const descriptorPath = takeOption(args, "--browser-host-descriptor") ?? paths.descriptorPath;
     const acknowledgedUnofficial = takeFlag(args, "--acknowledge-unofficial");
     const refreshAccountCapabilities = takeFlag(args, "--refresh-account-capabilities");
-    const biggerContext = takeFlag(args, "--bigger-context");
-    const standardContext = takeFlag(args, "--standard-context");
-    if (biggerContext && standardContext) {
-      throw new Error("Choose at most one context mode: --bigger-context or --standard-context");
-    }
     if (args.length > 0) throw new Error(`Unknown DEV setup arguments: ${args.join(" ")}`);
     const result = await setupDevProfile({
       mode: full ? "full" : "browser-only",
       browserHostDescriptorPath: descriptorPath,
       refreshAccountCapabilities,
       acknowledgedUnofficial,
-      ...(biggerContext || standardContext ? { experimentalBiggerContext: biggerContext } : {}),
       ...(tunnelId ? { tunnelId } : {}),
       ...(runtimeKeyFile ? { runtimeKeyFile } : {}),
       ...(appName ? { appName } : {}),
@@ -379,7 +363,6 @@ export async function runDevCommand(args: string[]): Promise<void> {
     throw new Error("DEV connector identity is outdated. Refresh the DEV profile in the launcher before starting a named chat");
   }
   const runtimeStateRoot = paths.runtimePath;
-  const features = readDevChatExperimentalFeatures(paths);
   await assertLauncherReady(config);
   const transport = config.mode === "full"
     ? await startDevChatTransport(config, paths.runtimePath)
@@ -394,12 +377,12 @@ export async function runDevCommand(args: string[]): Promise<void> {
         ...(transport ? { broker: transport.broker } : {}),
       },
     );
-    driver = new DevChatDriver(runtimeConfig, store, runtime.adapterFactory, process.cwd(), features);
+    driver = new DevChatDriver(runtimeConfig, store, runtime.adapterFactory, process.cwd());
     const opened = driver.open(name, requestedModel ?? defaultDevChatModel(runtimeConfig));
     if (requestedModel && opened.state.model !== requestedModel) {
       driver.setModel(opened.state, requestedModel);
     }
-    printHeader(opened.state, opened.created, driver.status(opened.state), runtimeConfig.mode, features.biggerContext);
+    printHeader(opened.state, opened.created, driver.status(opened.state), runtimeConfig.mode);
     if (message) await executeMessage(driver, opened.state, message);
     else await interactive(driver, opened.state);
   } finally {

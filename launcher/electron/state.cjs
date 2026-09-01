@@ -14,7 +14,6 @@ const DEFAULT_STATE = Object.freeze({
   keepRunningOnClose: true,
   showBrowserDuringTurns: true,
   disableChatGptBrowserWorkarounds: false,
-  experimentalBiggerContext: false,
   browserSmokePassed: false,
   browserSmokeVersion: null,
   sidebarOpen: true,
@@ -34,6 +33,7 @@ function readState(filePath) {
     if (!parsed || parsed.version !== 1) return { ...DEFAULT_STATE };
     const state = { ...DEFAULT_STATE, ...parsed };
     delete state.bridgeEnabled;
+    delete state.experimentalBiggerContext;
     if (state.language !== null && state.language !== "en" && state.language !== "zh-CN") {
       state.language = DEFAULT_STATE.language;
     }
@@ -45,7 +45,6 @@ function readState(filePath) {
       "keepRunningOnClose",
       "showBrowserDuringTurns",
       "disableChatGptBrowserWorkarounds",
-      "experimentalBiggerContext",
       "browserSmokePassed",
       "sidebarOpen",
     ]) {
