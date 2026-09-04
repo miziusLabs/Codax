@@ -57,7 +57,7 @@ function launcherConfig(descriptorPath, overrides = {}) {
     chromeExecutablePath: process.execPath,
     storageStatePath: path.join(root, "storage-state.json"),
     brokerSocketPath: process.platform === "win32"
-      ? "\\\\.\\pipe\\codex-chatgpt-web-runtime-supervisor-test"
+      ? "\\\\.\\pipe\\codax-runtime-supervisor-test"
       : path.join(root, "turn-broker.sock"),
     headed: true,
     proAvailable: true,
@@ -81,11 +81,11 @@ test("packaged runtime paths are native on Windows and Unix", () => {
 test("Linux autostart launches the durable AppImage invisibly", () => {
   const entry = linuxDesktopEntry(
     { getPath: () => "/tmp/transient-electron" },
-    "/home/example/Applications/Codex Web GPT.AppImage",
+    "/home/example/Applications/Codax.AppImage",
   );
   assert.match(
     entry,
-    /^Exec="\/home\/example\/Applications\/Codex Web GPT\.AppImage" --hidden$/m,
+    /^Exec="\/home\/example\/Applications\/Codax\.AppImage" --hidden$/m,
   );
   assert.doesNotMatch(entry, /APPIMAGE_EXTRACT_AND_RUN/);
   assert.match(entry, /^Terminal=false$/m);
@@ -95,20 +95,20 @@ test("Linux autostart launches the durable AppImage invisibly", () => {
 test("Linux autostart escapes desktop-entry field codes in executable paths", () => {
   const entry = linuxDesktopEntry(
     { getPath: () => "/tmp/transient-electron" },
-    "/home/example/100% ready/Codex Web GPT.AppImage",
+    "/home/example/100% ready/Codax.AppImage",
   );
-  assert.match(entry, /"\/home\/example\/100%% ready\/Codex Web GPT\.AppImage" --hidden/);
+  assert.match(entry, /"\/home\/example\/100%% ready\/Codax\.AppImage" --hidden/);
 });
 
 test("Linux autostart follows the stable installer wrapper across app updates", () => {
-  const previous = process.env.CODEX_WEB_GPT_LAUNCHER_EXECUTABLE;
-  process.env.CODEX_WEB_GPT_LAUNCHER_EXECUTABLE = "/home/example/.local/bin/codex-web-gpt";
+  const previous = process.env.CODAX_LAUNCHER_EXECUTABLE;
+  process.env.CODAX_LAUNCHER_EXECUTABLE = "/home/example/.local/bin/codax";
   try {
     const entry = linuxDesktopEntry({ getPath: () => "/tmp/versioned-appimage-mount" });
-    assert.match(entry, /"\/home\/example\/\.local\/bin\/codex-web-gpt" --hidden/);
+    assert.match(entry, /"\/home\/example\/\.local\/bin\/codax" --hidden/);
   } finally {
-    if (previous === undefined) delete process.env.CODEX_WEB_GPT_LAUNCHER_EXECUTABLE;
-    else process.env.CODEX_WEB_GPT_LAUNCHER_EXECUTABLE = previous;
+    if (previous === undefined) delete process.env.CODAX_LAUNCHER_EXECUTABLE;
+    else process.env.CODAX_LAUNCHER_EXECUTABLE = previous;
   }
 });
 
@@ -151,7 +151,7 @@ test("launcher runtime ownership cannot cross production and DEV profiles", () =
 });
 
 test("DEV runtime supervision ignores launcher version mismatch and starts only the isolated MCP tunnel", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-dev-tunnel-supervisor-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-dev-tunnel-supervisor-"));
   const descriptorPath = path.join(root, "runtime", "launcher-browser.json");
   fs.mkdirSync(path.dirname(descriptorPath), { recursive: true });
   const config = launcherConfig(descriptorPath, {
@@ -164,8 +164,8 @@ test("DEV runtime supervision ignores launcher version mismatch and starts only 
       tunnelId: "tunnel_0123456789abcdef0123456789abcdef",
       runtimeKeyFile: path.join(root, "secrets", "runtime.key"),
       profileDir: path.join(root, "tunnel", "profiles"),
-      profileName: "codex-chatgpt-web-dev",
-      alias: "codex-chatgpt-web-dev",
+      profileName: "codax-dev",
+      alias: "codax-dev",
     },
   });
   fs.writeFileSync(path.join(root, "config.json"), `${JSON.stringify(config)}\n`);
@@ -219,14 +219,14 @@ test("launcher runtime validation rejects a relative full-mode executable before
       tunnelId: "tunnel_0123456789abcdef0123456789abcdef",
       runtimeKeyFile: path.join(os.tmpdir(), "runtime.key"),
       profileDir: path.join(os.tmpdir(), "profiles"),
-      profileName: "codex-chatgpt-web",
-      alias: "codex-chatgpt-web",
+      profileName: "codax",
+      alias: "codax",
     },
   }), descriptorPath), /absolute tunnel\.binaryPath/);
 });
 
 test("launcher runtime validation accepts native Windows paths and a named pipe", () => {
-  const descriptorPath = "C:\\Users\\Example\\AppData\\Local\\Codex Web GPT\\launcher-browser.json";
+  const descriptorPath = "C:\\Users\\Example\\AppData\\Local\\Codax\\launcher-browser.json";
   const config = {
     version: 3,
     releaseVersion: "0.2.0",
@@ -238,53 +238,53 @@ test("launcher runtime validation accepts native Windows paths and a named pipe"
     browserHost: "launcher",
     browserHostDescriptorPath: descriptorPath.toLowerCase(),
     chromeExecutablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    storageStatePath: "C:\\Users\\Example\\AppData\\Local\\Codex Web GPT\\storage-state.json",
-    brokerSocketPath: "\\\\.\\pipe\\codex-chatgpt-web-runtime-supervisor-test",
+    storageStatePath: "C:\\Users\\Example\\AppData\\Local\\Codax\\storage-state.json",
+    brokerSocketPath: "\\\\.\\pipe\\codax-runtime-supervisor-test",
     headed: true,
     solAvailable: true,
     proAvailable: true,
     autoApproveToolCalls: false,
     controlToken: "runtime-supervisor-control-token-0123456789abcdef",
-    runtimeCommand: ["C:\\Users\\Example\\.codex-chatgpt-web\\runtime\\bun.exe"],
+    runtimeCommand: ["C:\\Users\\Example\\.codax\\runtime\\bun.exe"],
   };
   assert.equal(validateConfig(config, descriptorPath, "win32"), config);
 });
 
 test("launcher delegates long-lived tunnel supervision to native runtimes connect", () => {
-  const config = launcherConfig("C:\\Users\\Example\\.codex-chatgpt-web\\runtime\\launcher-browser.json", {
+  const config = launcherConfig("C:\\Users\\Example\\.codax\\runtime\\launcher-browser.json", {
     mode: "full",
     runtimeCommand: [
-      "C:\\Users\\Example\\.codex-chatgpt-web\\versions\\0.2.0-win32-x64\\runtime\\bun.exe",
-      "C:\\Users\\Example\\.codex-chatgpt-web\\versions\\0.2.0-win32-x64\\app\\cli.js",
+      "C:\\Users\\Example\\.codax\\versions\\0.2.0-win32-x64\\runtime\\bun.exe",
+      "C:\\Users\\Example\\.codax\\versions\\0.2.0-win32-x64\\app\\cli.js",
     ],
-    brokerSocketPath: "\\\\.\\pipe\\codex-chatgpt-web-example",
+    brokerSocketPath: "\\\\.\\pipe\\codax-example",
     tunnel: {
-      binaryPath: "C:\\Users\\Example\\.codex-chatgpt-web\\bin\\tunnel-client.exe",
+      binaryPath: "C:\\Users\\Example\\.codax\\bin\\tunnel-client.exe",
       tunnelId: "tunnel_0123456789abcdef0123456789abcdef",
-      runtimeKeyFile: "C:\\Users\\Example\\.codex-chatgpt-web\\secrets\\tunnel-runtime.key",
-      profileDir: "C:\\Users\\Example\\.codex-chatgpt-web\\tunnel\\profiles",
-      profileName: "codex-chatgpt-web",
-      alias: "codex-chatgpt-web",
+      runtimeKeyFile: "C:\\Users\\Example\\.codax\\secrets\\tunnel-runtime.key",
+      profileDir: "C:\\Users\\Example\\.codax\\tunnel\\profiles",
+      profileName: "codax",
+      alias: "codax",
     },
   });
   const invocation = {
-    executable: "C:\\Program Files\\Codex Web GPT\\resources\\runtime\\bun.exe",
+    executable: "C:\\Program Files\\Codax\\resources\\runtime\\bun.exe",
     args: [
-      "C:\\Program Files\\Codex Web GPT\\resources\\runtime\\app\\cli.js",
+      "C:\\Program Files\\Codax\\resources\\runtime\\app\\cli.js",
       "mcp",
       "--broker-socket",
       config.brokerSocketPath,
     ],
-    cwd: "C:\\Program Files\\Codex Web GPT\\resources\\runtime",
+    cwd: "C:\\Program Files\\Codax\\resources\\runtime",
   };
   const args = managedTunnelConnectArgs(config, invocation);
   assert.deepEqual(args.slice(0, 4), [
-    "runtimes", "connect", "--alias", "codex-chatgpt-web",
+    "runtimes", "connect", "--alias", "codax",
   ]);
   assert.equal(args.includes("run"), false);
   assert.equal(args.at(-1), "--json");
   assert.equal(args[args.indexOf("--mcp-command") + 1].includes("bun.exe"), true);
-  assert.equal(args[args.indexOf("--mcp-command") + 1].includes("\\\\\\\\.\\\\pipe\\\\codex-chatgpt-web-example"), true);
+  assert.equal(args[args.indexOf("--mcp-command") + 1].includes("\\\\\\\\.\\\\pipe\\\\codax-example"), true);
   assert.equal(args[args.indexOf("--mcp-command") + 1].includes("versions"), false);
   assert.throws(
     () => managedTunnelConnectArgs(config),
@@ -293,7 +293,7 @@ test("launcher delegates long-lived tunnel supervision to native runtimes connec
 });
 
 test("launcher repairs its runtime before building the tunnel MCP command", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-runtime-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-runtime-"));
   const config = launcherConfig(path.join(root, "launcher-browser.json"), {
     mode: "full",
     runtimeCommand: [path.join(root, "versions", "stale", "runtime", "bun")],
@@ -302,8 +302,8 @@ test("launcher repairs its runtime before building the tunnel MCP command", asyn
       tunnelId: "tunnel_0123456789abcdef0123456789abcdef",
       runtimeKeyFile: path.join(root, "secrets", "tunnel-runtime.key"),
       profileDir: path.join(root, "tunnel", "profiles"),
-      profileName: "codex-chatgpt-web",
-      alias: "codex-chatgpt-web",
+      profileName: "codax",
+      alias: "codax",
     },
   });
   const repairedRuntime = path.join(root, "launcher-runtime");
@@ -344,7 +344,7 @@ test("launcher repairs its runtime before building the tunnel MCP command", asyn
 });
 
 test("tunnel control failures preserve stderr even when stdout is also present", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-control-output-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-control-output-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -372,7 +372,7 @@ test("tunnel control failures preserve stderr even when stdout is also present",
 });
 
 test("tunnel health diagnostics preserve the machine-readable readiness state", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-health-detail-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-health-detail-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -387,7 +387,7 @@ test("tunnel health diagnostics preserve the machine-readable readiness state", 
       code: 0,
       output: JSON.stringify({
         entries: [{
-          alias: "codex-web-gpt",
+          alias: "codax",
           runtime_state: "stopped",
           classification: "stale_alias",
           live_runtime: { found: false },
@@ -397,7 +397,7 @@ test("tunnel health diagnostics preserve the machine-readable readiness state", 
   };
   try {
     assert.deepEqual(await supervisor.readTunnelHealth({
-      tunnel: { alias: "codex-web-gpt" },
+      tunnel: { alias: "codax" },
     }), {
       ready: false,
       pid: null,
@@ -415,7 +415,7 @@ test("tunnel health diagnostics preserve the machine-readable readiness state", 
 });
 
 test("tunnel failures surface a bounded summary instead of dumping the JSON payload into the UI", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-summary-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-summary-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -439,7 +439,7 @@ test("tunnel failures surface a bounded summary instead of dumping the JSON payl
   });
   try {
     const health = await supervisor.readTunnelHealth({
-      tunnel: { alias: "codex-web-gpt" },
+      tunnel: { alias: "codax" },
     });
     assert.match(health.detail, /state=stopped/);
     assert.match(health.detail, /runtime principal cannot use/);
@@ -451,7 +451,7 @@ test("tunnel failures surface a bounded summary instead of dumping the JSON payl
 });
 
 test("tunnel readiness preserves a native managed process identity when one is reported", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-health-pid-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-health-pid-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -463,7 +463,7 @@ test("tunnel readiness preserves a native managed process identity when one is r
     code: 0,
     output: JSON.stringify({
       entries: [{
-        alias: "codex-web-gpt",
+        alias: "codax",
         runtime_state: "ready",
         classification: "active_runtime",
         live_runtime: {
@@ -476,7 +476,7 @@ test("tunnel readiness preserves a native managed process identity when one is r
   });
   try {
     assert.deepEqual(await supervisor.readTunnelHealth({
-      tunnel: { alias: "codex-web-gpt" },
+      tunnel: { alias: "codax" },
     }), {
       ready: true,
       pid: 123_456_779,
@@ -493,7 +493,7 @@ test("tunnel readiness preserves a native managed process identity when one is r
 });
 
 test("steady tunnel monitoring uses the runtime local health endpoints without a control-plane status lookup", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-local-tunnel-health-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-local-tunnel-health-"));
   const health = await localHealthServer();
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
@@ -520,7 +520,7 @@ test("steady tunnel monitoring uses the runtime local health endpoints without a
 });
 
 test("an unavailable local probe plus a stalled native status is unknown, not proof that the tunnel died", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-unknown-tunnel-health-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-unknown-tunnel-health-"));
   const port = await freePort();
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
@@ -544,7 +544,7 @@ test("an unavailable local probe plus a stalled native status is unknown, not pr
 });
 
 test("an explicit local readiness failure remains actionable tunnel evidence", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-degraded-tunnel-health-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-degraded-tunnel-health-"));
   const health = await localHealthServer(pathname => pathname === "/readyz" ? 503 : 200);
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
@@ -567,7 +567,7 @@ test("an explicit local readiness failure remains actionable tunnel evidence", a
 });
 
 test("recent internal MCP transport failures override false-green tunnel readiness", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-mcp-degraded-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-mcp-degraded-"));
   const health = await localHealthServer(
     () => 200,
     pathname => pathname.startsWith("/api/logs")
@@ -608,7 +608,7 @@ test("recent internal MCP transport failures override false-green tunnel readine
 });
 
 test("tunnel readiness accepts the official tmux status without inventing a PID", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-health-tmux-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-health-tmux-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -620,7 +620,7 @@ test("tunnel readiness accepts the official tmux status without inventing a PID"
     code: 0,
     output: JSON.stringify({
       entries: [{
-        alias: "codex-chatgpt-web",
+        alias: "codax",
         runtime_state: "ready",
         classification: "active_runtime",
         live_runtime: { found: true, base_url: "http://127.0.0.1:12345" },
@@ -629,11 +629,11 @@ test("tunnel readiness accepts the official tmux status without inventing a PID"
   });
   try {
     const health = await supervisor.readTunnelHealth({
-      tunnel: { alias: "codex-chatgpt-web" },
+      tunnel: { alias: "codax" },
     });
     assert.equal(health.ready, true);
     assert.equal(health.pid, null);
-    await supervisor.waitForTunnel({ tunnel: { alias: "codex-chatgpt-web" } }, 1);
+    await supervisor.waitForTunnel({ tunnel: { alias: "codax" } }, 1);
     assert.equal(supervisor.tunnel?.managed, true);
     assert.equal(supervisor.tunnel?.pid, null);
   } finally {
@@ -642,7 +642,7 @@ test("tunnel readiness accepts the official tmux status without inventing a PID"
 });
 
 test("a clean machine reports the official unknown-alias status as an absent runtime", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-absent-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-absent-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -656,7 +656,7 @@ test("a clean machine reports the official unknown-alias status as an absent run
   });
   try {
     const health = await supervisor.readTunnelHealth({
-      tunnel: { alias: "codex-chatgpt-web" },
+      tunnel: { alias: "codax" },
     });
     assert.equal(health.ready, false);
     assert.equal(health.absent, true);
@@ -668,7 +668,7 @@ test("a clean machine reports the official unknown-alias status as an absent run
 });
 
 test("managed startup fails immediately when native status reports a stopped runtime", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-stopped-start-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-stopped-start-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -696,14 +696,14 @@ test("managed startup fails immediately when native status reports a stopped run
 });
 
 test("launcher adopts a healthy native managed tunnel without spawning a foreground wrapper", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-managed-tunnel-adopt-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-managed-tunnel-adopt-"));
   const binaryPath = path.join(root, "tunnel-client");
   const runtimeKeyFile = path.join(root, "runtime.key");
   const profileDir = path.join(root, "profiles");
   fs.mkdirSync(profileDir, { recursive: true });
   fs.writeFileSync(binaryPath, "binary");
   fs.writeFileSync(runtimeKeyFile, "runtime-key");
-  fs.writeFileSync(path.join(profileDir, "codex-chatgpt-web.yaml"), "profile");
+  fs.writeFileSync(path.join(profileDir, "codax.yaml"), "profile");
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -731,7 +731,7 @@ test("launcher adopts a healthy native managed tunnel without spawning a foregro
         binaryPath,
         runtimeKeyFile,
         profileDir,
-        profileName: "codex-chatgpt-web",
+        profileName: "codax",
       },
     });
     assert.equal(connects, 0);
@@ -744,21 +744,21 @@ test("launcher adopts a healthy native managed tunnel without spawning a foregro
 });
 
 test("tunnel recovery replaces a false-green managed runtime and proves the fresh MCP transport", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-managed-tunnel-recovery-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-managed-tunnel-recovery-"));
   const binaryPath = path.join(root, "tunnel-client");
   const runtimeKeyFile = path.join(root, "runtime.key");
   const profileDir = path.join(root, "profiles");
   fs.mkdirSync(profileDir, { recursive: true });
   fs.writeFileSync(binaryPath, "binary");
   fs.writeFileSync(runtimeKeyFile, "runtime-key");
-  fs.writeFileSync(path.join(profileDir, "codex-chatgpt-web.yaml"), "profile");
+  fs.writeFileSync(path.join(profileDir, "codax.yaml"), "profile");
   const config = {
     mode: "full",
     tunnel: {
       binaryPath,
       runtimeKeyFile,
       profileDir,
-      profileName: "codex-chatgpt-web",
+      profileName: "codax",
     },
   };
   const supervisor = new RuntimeSupervisor({
@@ -813,14 +813,14 @@ test("tunnel recovery replaces a false-green managed runtime and proves the fres
 });
 
 test("launcher stops an unhealthy managed runtime before reconnecting the alias", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-managed-tunnel-reconnect-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-managed-tunnel-reconnect-"));
   const binaryPath = path.join(root, "tunnel-client");
   const runtimeKeyFile = path.join(root, "runtime.key");
   const profileDir = path.join(root, "profiles");
   fs.mkdirSync(profileDir, { recursive: true });
   fs.writeFileSync(binaryPath, "binary");
   fs.writeFileSync(runtimeKeyFile, "runtime-key");
-  fs.writeFileSync(path.join(profileDir, "codex-chatgpt-web.yaml"), "profile");
+  fs.writeFileSync(path.join(profileDir, "codax.yaml"), "profile");
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -855,7 +855,7 @@ test("launcher stops an unhealthy managed runtime before reconnecting the alias"
         binaryPath,
         runtimeKeyFile,
         profileDir,
-        profileName: "codex-chatgpt-web",
+        profileName: "codax",
       },
     });
     assert.deepEqual(events, [
@@ -871,7 +871,7 @@ test("launcher stops an unhealthy managed runtime before reconnecting the alias"
 });
 
 test("failed tunnel startup accepts an absent alias only after its recorded process has exited", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-dead-cleanup-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-dead-cleanup-"));
   const binaryPath = path.join(root, "tunnel-client");
   const runtimeKeyFile = path.join(root, "runtime.key");
   fs.writeFileSync(binaryPath, "binary");
@@ -896,8 +896,8 @@ test("failed tunnel startup accepts an absent alias only after its recorded proc
   supervisor.runTunnelStopCommand = async () => ({
     code: 1,
     stdout: "",
-    stderr: "alias codex-chatgpt-web is not known",
-    output: "alias codex-chatgpt-web is not known",
+    stderr: "alias codax is not known",
+    output: "alias codax is not known",
   });
   supervisor.runTunnelConnectCommand = async () => {
     supervisor.tunnel = {
@@ -918,8 +918,8 @@ test("failed tunnel startup accepts an absent alias only after its recorded proc
           binaryPath,
           runtimeKeyFile,
           profileDir: root,
-          profileName: "codex-chatgpt-web",
-          alias: "codex-chatgpt-web",
+          profileName: "codax",
+          alias: "codax",
           tunnelId: "tunnel_0123456789abcdef0123456789abcdef",
         },
       }),
@@ -936,7 +936,7 @@ test("failed tunnel startup accepts an absent alias only after its recorded proc
 });
 
 test("graceful tunnel stop uses the native status contract instead of killing a recorded PID", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-wrapper-stop-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-wrapper-stop-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -961,7 +961,7 @@ test("graceful tunnel stop uses the native status contract instead of killing a 
 });
 
 test("failed native tunnel shutdown keeps the managed runtime monitored", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-stop-refused-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-stop-refused-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -987,7 +987,7 @@ test("failed native tunnel shutdown keeps the managed runtime monitored", async 
 });
 
 test("an accepted tunnel stop without terminal proof keeps the alias supervised", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-stop-unconfirmed-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-stop-unconfirmed-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -1016,7 +1016,7 @@ test("an accepted tunnel stop without terminal proof keeps the alias supervised"
 });
 
 test("stopping a tunnel monitor invalidates results from its previous generation", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-monitor-generation-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-monitor-generation-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -1034,7 +1034,7 @@ test("stopping a tunnel monitor invalidates results from its previous generation
 });
 
 test("launcher shutdown reacquires a managed tunnel that was between monitor and recovery states", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-tunnel-stop-reconcile-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-tunnel-stop-reconcile-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -1042,7 +1042,7 @@ test("launcher shutdown reacquires a managed tunnel that was between monitor and
     coreHome: root,
     browserDescriptorPath: path.join(root, "launcher.json"),
   });
-  const config = { mode: "full", tunnel: { alias: "codex-chatgpt-web" } };
+  const config = { mode: "full", tunnel: { alias: "codax" } };
   let stops = 0;
   let confirmations = 0;
   supervisor.readConfig = () => config;
@@ -1074,7 +1074,7 @@ test("launcher shutdown reacquires a managed tunnel that was between monitor and
 });
 
 test("crash-loop diagnostics include the last redacted child failure", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-crash-loop-diagnostic-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-crash-loop-diagnostic-"));
   const operations = [];
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
@@ -1299,7 +1299,7 @@ test("launcher marks compensation ready only after both owned runtime processes 
 });
 
 test("failed initial health checks stop their child without scheduling crash recovery", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-startup-cleanup-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-startup-cleanup-"));
   const childPath = path.join(root, "child.cjs");
   fs.writeFileSync(childPath, "setInterval(() => {}, 1000);\n");
   const supervisor = new RuntimeSupervisor({
@@ -1332,7 +1332,7 @@ test("failed initial health checks stop their child without scheduling crash rec
 });
 
 test("launcher preserves stale ownership evidence when an old active runtime cannot be drained", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-active-stale-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-active-stale-"));
   const descriptorPath = path.join(root, "runtime", "launcher-browser.json");
   const statePath = path.join(root, "runtime", "launcher-supervisor.json");
   fs.mkdirSync(path.dirname(descriptorPath), { recursive: true });
@@ -1373,7 +1373,7 @@ test("launcher preserves stale ownership evidence when an old active runtime can
 });
 
 test("launcher recovers a stale tunnel even when no stale Responses proxy is reachable", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-stale-tunnel-only-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-stale-tunnel-only-"));
   const descriptorPath = path.join(root, "runtime", "launcher-browser.json");
   fs.mkdirSync(path.dirname(descriptorPath), { recursive: true });
   fs.writeFileSync(descriptorPath, "{}\n");
@@ -1385,8 +1385,8 @@ test("launcher recovers a stale tunnel even when no stale Responses proxy is rea
       tunnelId: "tunnel_0123456789abcdef0123456789abcdef",
       runtimeKeyFile: path.join(root, "runtime.key"),
       profileDir: path.join(root, "profiles"),
-      profileName: "codex-chatgpt-web",
-      alias: "codex-chatgpt-web",
+      profileName: "codax",
+      alias: "codax",
     },
   }))}\n`);
   fs.writeFileSync(path.join(root, "runtime", "launcher-supervisor.json"), `${JSON.stringify({
@@ -1426,7 +1426,7 @@ test("launcher recovers a stale tunnel even when no stale Responses proxy is rea
 });
 
 test("stale ownership recovery stops a managed tmux runtime even though it has no PID", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-stale-tmux-tunnel-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-stale-tmux-tunnel-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -1471,7 +1471,7 @@ test("stale ownership recovery stops a managed tmux runtime even though it has n
   try {
     assert.equal(await supervisor.stopStaleOwnedRuntime({
       mode: "full",
-      tunnel: { alias: "codex-chatgpt-web" },
+      tunnel: { alias: "codax" },
     }), true);
     assert.equal(stops, 1);
     assert.equal(fs.existsSync(supervisor.statePath), false);
@@ -1481,7 +1481,7 @@ test("stale ownership recovery stops a managed tmux runtime even though it has n
 });
 
 test("launcher fails closed on a corrupt runtime ownership marker", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-corrupt-runtime-state-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-corrupt-runtime-state-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -1499,7 +1499,7 @@ test("launcher fails closed on a corrupt runtime ownership marker", () => {
 });
 
 test("launcher clears an empty stale ownership marker when Windows reuses its PID", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-reused-owner-pid-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-reused-owner-pid-"));
   const pidOccupant = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
     stdio: "ignore",
   });
@@ -1529,7 +1529,7 @@ test("launcher clears an empty stale ownership marker when Windows reuses its PI
 });
 
 test("a failed full-runtime marker with no child evidence cannot block removal on a stalled tunnel probe", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-dead-runtime-removal-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-dead-runtime-removal-"));
   const descriptorPath = path.join(root, "runtime", "launcher-browser.json");
   const configPath = path.join(root, "config.json");
   const statePath = path.join(root, "runtime", "launcher-supervisor.json");
@@ -1542,8 +1542,8 @@ test("a failed full-runtime marker with no child evidence cannot block removal o
       tunnelId: "tunnel_0123456789abcdef0123456789abcdef",
       runtimeKeyFile: path.join(root, "runtime.key"),
       profileDir: path.join(root, "profiles"),
-      profileName: "codex-chatgpt-web",
-      alias: "codex-chatgpt-web",
+      profileName: "codax",
+      alias: "codax",
     },
   }))}\n`);
   fs.writeFileSync(statePath, `${JSON.stringify({
@@ -1577,7 +1577,7 @@ test("a failed full-runtime marker with no child evidence cannot block removal o
 });
 
 test("external migration clears only stale launcher ownership evidence", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-external-migration-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-external-migration-"));
   const supervisor = new RuntimeSupervisor({
     app: { getVersion: () => "0.2.0", isPackaged: false },
     logger: { info() {}, warn() {}, error() {} },
@@ -1609,7 +1609,7 @@ test("external migration clears only stale launcher ownership evidence", () => {
 });
 
 test("launcher supervisor starts, health-checks, drains, and stops its daemon", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-supervisor-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-supervisor-"));
   const descriptorPath = path.join(root, "runtime", "launcher-browser.json");
   const configPath = path.join(root, "config.json");
   const serverPath = path.join(root, "fake-runtime.cjs");
@@ -1630,7 +1630,7 @@ const server = http.createServer((request, response) => {
   if (request.url === "/healthz") {
     response.end(JSON.stringify({
       status: "ok",
-      service: "codex-chatgpt-web",
+      service: "codax",
       mode: config.mode,
       version: config.releaseVersion,
       pid: process.pid,
@@ -1694,7 +1694,7 @@ process.once("SIGTERM", () => server.close(() => process.exit(0)));
 });
 
 test("launcher supervisor safely replaces an idle daemon left by a crashed launcher owner", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-stale-owner-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-stale-owner-"));
   const descriptorPath = path.join(root, "runtime", "launcher-browser.json");
   const statePath = path.join(root, "runtime", "launcher-supervisor.json");
   const configPath = path.join(root, "config.json");
@@ -1717,7 +1717,7 @@ const server = http.createServer((request, response) => {
   if (request.url === "/healthz") {
     response.end(JSON.stringify({
       status: "ok",
-      service: "codex-chatgpt-web",
+      service: "codax",
       mode: config.mode,
       version: config.releaseVersion,
       pid: process.pid,

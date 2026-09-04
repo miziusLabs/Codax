@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "codex-chatgpt-web",
+      "name": "codax",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
         "fflate": "^0.8.2",

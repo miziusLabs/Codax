@@ -6,7 +6,7 @@ function subscription(channel, listener) {
   return () => ipcRenderer.removeListener(channel, wrapped);
 }
 
-contextBridge.exposeInMainWorld("codexWebLauncher", {
+contextBridge.exposeInMainWorld("codaxLauncher", {
   snapshot: () => ipcRenderer.invoke("launcher:snapshot"),
   setLanguage: (language) => ipcRenderer.invoke("launcher:set-language", language),
   completeOnboarding: (language) => ipcRenderer.invoke("launcher:complete-onboarding", language),

@@ -11,7 +11,7 @@ const {
 } = require("../electron/state.cjs");
 
 test("launcher state persists onboarding, language, and autostart atomically", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-launcher-state-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-launcher-state-"));
   const file = path.join(root, "state.json");
   try {
     const store = createStateStore(file);
@@ -75,7 +75,7 @@ test("sidebar state accepts only bounded native shell dimensions", () => {
 });
 
 test("persisted sidebar corruption is repaired without changing the rest of launcher state", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-web-gpt-sidebar-state-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-sidebar-state-"));
   const file = path.join(root, "state.json");
   try {
     fs.writeFileSync(file, JSON.stringify({

@@ -1,6 +1,6 @@
 # Contributing
 
-Codex Web GPT was created and is primarily developed and maintained by
+Codax was created and is primarily developed and maintained by
 [@miuuyy](https://github.com/miuuyy). Product direction, core architecture, and release decisions
 remain with the creator. Other contributors listed by GitHub have provided focused external fixes
 rather than shared product or architectural ownership.
@@ -17,8 +17,8 @@ large unsolicited pull request may be closed even when substantial work went int
 
 ## Scope and invariants
 
-- Keep the project focused on ChatGPT web-backed Codex models. Generic providers and unrelated
-  product surfaces are out of scope.
+- Keep contributions aligned with Codax's purpose: useful local utilities and backend integrations
+  for Codex. Generic providers and unrelated product surfaces are out of scope.
 - Model selection is explicit. Never silently fall back to another model or reasoning level.
 - Full mode exposes local tools only through the active outer Codex registry and official MCP
   tunnel. Browser-only mode must not create a broker capability or attach an MCP connector.

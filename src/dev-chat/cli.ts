@@ -27,15 +27,15 @@ import {
 } from "./profile";
 import { DEV_CONFIG_PURPOSE, DEV_LAUNCHER_PROFILE } from "./constants";
 
-const DEV_HELP = `Codex Web GPT DEV chat
+const DEV_HELP = `Codax DEV chat
 
 Usage:
-  codex-chatgpt-web dev launcher
-  codex-chatgpt-web dev status [--json]
-  codex-chatgpt-web dev setup --browser-only
-  codex-chatgpt-web dev setup --full --tunnel-id ID --runtime-key-file PATH
-  codex-chatgpt-web dev chat NAME [--model MODEL] [MESSAGE]
-  codex-chatgpt-web dev list
+  codax dev launcher
+  codax dev status [--json]
+  codax dev setup --browser-only
+  codax dev setup --full --tunnel-id ID --runtime-key-file PATH
+  codax dev chat NAME [--model MODEL] [MESSAGE]
+  codax dev list
 
 Repository shortcut:
   bun run dev:launcher
@@ -145,7 +145,7 @@ function printHeader(
   status: DevContextStatus,
   mode: "browser-only" | "full",
 ): void {
-  stdout.write(`${bold("Codex Web GPT DEV")} · ${created ? "created" : "continued"} chat ${cyan(state.name)}\n`);
+  stdout.write(`${bold("Codax DEV")} · ${created ? "created" : "continued"} chat ${cyan(state.name)}\n`);
   stdout.write(`model ${state.model} · ${mode === "full" ? "tools explicitly simulated" : "browser-only, no outer tools"} · live launcher browser\n`);
   stdout.write(`context ${statusLine(status)}\n`);
   stdout.write(`${dim("Codex route is untouched. No Responses port is bound, replaced, stopped, or restarted.")}\n`);

@@ -37,7 +37,7 @@ if (bundled.status !== 0) {
   throw new Error(`Could not read bundled Codex models: ${bundled.error?.message || bundled.stderr}`);
 }
 
-const root = mkdtempSync(join(tmpdir(), "codex-chatgpt-web-live-subagents-"));
+const root = mkdtempSync(join(tmpdir(), "codax-live-subagents-"));
 const codexHome = join(root, "codex");
 mkdirSync(codexHome, { recursive: true });
 const catalogPath = join(root, "models.json");
@@ -55,9 +55,9 @@ writeFileSync(join(codexHome, "config.toml"), [
   `model_catalog_json = ${JSON.stringify(catalogPath)}`,
   "",
   "[model_providers.live_bridge]",
-  'name = "Live codex-chatgpt-web bridge"',
+  'name = "Live codax bridge"',
   `base_url = ${JSON.stringify(bridgeBaseUrl)}`,
-  'env_key = "CODEX_WEB_LIVE_SMOKE_KEY"',
+  'env_key = "CODAX_WEB_LIVE_SMOKE_KEY"',
   'wire_api = "responses"',
   "supports_websockets = false",
   "",
@@ -146,7 +146,7 @@ try {
     env: {
       ...process.env,
       CODEX_HOME: codexHome,
-      CODEX_WEB_LIVE_SMOKE_KEY: "loopback-live-smoke",
+      CODAX_WEB_LIVE_SMOKE_KEY: "loopback-live-smoke",
     },
     stdin: "ignore",
     stdout: "pipe",

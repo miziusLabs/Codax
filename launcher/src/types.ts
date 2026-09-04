@@ -150,6 +150,6 @@ export interface LauncherApi {
 
 declare global {
   interface Window {
-    codexWebLauncher?: LauncherApi;
+    codaxLauncher?: LauncherApi;
   }
 }

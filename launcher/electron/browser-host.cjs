@@ -20,7 +20,7 @@ const {
 
 const TEMPORARY_CHAT_URL = "https://chatgpt.com/?temporary-chat=true";
 const CHATGPT_ORIGIN = "https://chatgpt.com";
-const IDLE_BROWSER_URL = "about:blank#codex-web-gpt-browser-host";
+const IDLE_BROWSER_URL = "about:blank#codax-browser-host";
 const MAX_BROWSER_VIEW_DIMENSION = 16_384;
 const MAX_BROWSER_TABS = 5;
 const MAX_CANCELLED_TURN_TRACES = 256;
@@ -80,7 +80,7 @@ const CHATGPT_VIEWPORT_CSS = `
     overflow-x: hidden !important;
   }
 
-  [data-codex-web-gpt-sidebar="true"],
+  [data-codax-sidebar="true"],
   [data-testid="accounts-profile-button"],
   [data-testid="open-sidebar-button"],
   [data-testid="close-sidebar-button"],
@@ -107,10 +107,10 @@ function visibleElementScript(selector) {
 function ownedSurfaceScript(surfaceId) {
   const encoded = JSON.stringify(surfaceId);
   return `(() => {
-    Object.defineProperty(globalThis, "__CODEX_WEB_GPT_SURFACE_ID__", {
+    Object.defineProperty(globalThis, "__CODAX_SURFACE_ID__", {
       value: ${encoded}, configurable: true, enumerable: false, writable: false,
     });
-    document.documentElement.dataset.codexWebGptSurface = ${encoded};
+    document.documentElement.dataset.codaxSurface = ${encoded};
 
     const sidebarAnchors = [
       '[data-testid="accounts-profile-button"]',
@@ -134,13 +134,13 @@ function ownedSurfaceScript(surfaceId) {
         }
       }
       if (!candidate) return;
-      document.querySelectorAll('[data-codex-web-gpt-sidebar="true"]').forEach((element) => {
-        if (element !== candidate) element.removeAttribute('data-codex-web-gpt-sidebar');
+      document.querySelectorAll('[data-codax-sidebar="true"]').forEach((element) => {
+        if (element !== candidate) element.removeAttribute('data-codax-sidebar');
       });
-      candidate.setAttribute('data-codex-web-gpt-sidebar', 'true');
+      candidate.setAttribute('data-codax-sidebar', 'true');
     };
     markSidebar();
-    if (!globalThis.__CODEX_WEB_GPT_CHROME_OBSERVER__) {
+    if (!globalThis.__CODAX_CHROME_OBSERVER__) {
       let pending = false;
       const observer = new MutationObserver(() => {
         if (pending) return;
@@ -151,7 +151,7 @@ function ownedSurfaceScript(surfaceId) {
         });
       });
       observer.observe(document.documentElement, { childList: true, subtree: true });
-      Object.defineProperty(globalThis, "__CODEX_WEB_GPT_CHROME_OBSERVER__", {
+      Object.defineProperty(globalThis, "__CODAX_CHROME_OBSERVER__", {
         value: observer, configurable: true, enumerable: false, writable: false,
       });
     }
@@ -274,7 +274,7 @@ class BrowserHost {
     getPreferences,
     helper,
     logger,
-    partition = "persist:codex-web-gpt-chatgpt",
+    partition = "persist:codax-chatgpt",
     profile = "production",
     publishState,
   }) {
@@ -294,8 +294,8 @@ class BrowserHost {
       throw new Error("Browser host profile is invalid");
     }
     const expectedPartition = profile === "development"
-      ? "persist:codex-web-gpt-dev-chatgpt"
-      : "persist:codex-web-gpt-chatgpt";
+      ? "persist:codax-dev-chatgpt"
+      : "persist:codax-chatgpt";
     if (partition !== expectedPartition) throw new Error("Browser host partition does not match its profile");
     this.partition = partition;
     this.profile = profile;
@@ -1795,7 +1795,7 @@ class BrowserHost {
     if (!evidence
       || typeof evidence.effort !== "string"
       || !evidence.effort
-      || evidence.response !== "CODEX WEB GPT READY") {
+      || evidence.response !== "CODAX READY") {
       throw new Error("Browser helper returned invalid smoke-test evidence");
     }
     this.logger.info("smoke.completed", { effort: evidence.effort, responseChars: evidence.response.length });
@@ -1881,7 +1881,7 @@ class BrowserHost {
   writeDescriptor() {
     const descriptor = {
       version: 2,
-      kind: "codex-web-gpt-launcher",
+      kind: "codax-launcher",
       profile: this.profile,
       pid: process.pid,
       endpoint: `http://127.0.0.1:${this.cdpPort}`,

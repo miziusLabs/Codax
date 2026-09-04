@@ -12,7 +12,7 @@ const config = {
 
 test("setup accepts only a matching daemon that is ready for new Codex turns", () => {
   const ready = {
-    service: "codex-chatgpt-web",
+    service: "codax",
     status: "ok",
     mode: "browser-only",
     version: "0.2.0",

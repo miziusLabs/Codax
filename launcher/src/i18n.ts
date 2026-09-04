@@ -1,7 +1,7 @@
 import type { Language } from "./types";
 
 const en = {
-  product: "Codex Web GPT",
+  product: "Codax",
   devBadge: "DEV",
   devSetupTitle: "Set up the isolated DEV profile",
   devSetupSubtitle: "This browser, account, configuration, and runtime data stay separate from the normal launcher and Codex.",
@@ -16,7 +16,7 @@ const en = {
   devConnectorIsolationNotice: "Create a separate connector with the exact DEV name below. Keep Codex Native2 unchanged so production and repository development can run side by side.",
   devSettingsTitle: "DEV profile settings",
   devKeepRunningBody: "Keep the isolated browser session and DEV MCP tunnel available when this window closes.",
-  tagline: "ChatGPT Web inside the native Codex harness",
+  tagline: "ChatGPT Web and Codax utilities inside the native Codex harness",
   chooseLanguage: "Choose your language",
   chooseLanguageHint: "You can change this later in Settings.",
   english: "English",
@@ -49,7 +49,7 @@ const en = {
   browserReady: "Browser ready",
   showBrowser: "Show ChatGPT",
   hideBrowser: "Hide ChatGPT",
-  setupTitle: "Set up Codex Web GPT",
+  setupTitle: "Set up Codax",
   setupSubtitle: "Three checks make ChatGPT Web available in the native Codex model picker.",
   coreSetup: "Core setup",
   optional: "Optional",
@@ -144,7 +144,7 @@ const en = {
 } as const;
 
 const zh: Record<keyof typeof en, string> = {
-  product: "Codex Web GPT",
+  product: "Codax",
   devBadge: "DEV",
   devSetupTitle: "设置隔离的 DEV 配置",
   devSetupSubtitle: "此浏览器、账户、配置和运行数据与普通启动器及 Codex 完全分离。",
@@ -159,7 +159,7 @@ const zh: Record<keyof typeof en, string> = {
   devConnectorIsolationNotice: "请使用下方准确的 DEV 名称新建独立连接器。保留 Codex Native2 不变，让生产使用和仓库开发可以同时运行。",
   devSettingsTitle: "DEV 配置设置",
   devKeepRunningBody: "窗口关闭后保持隔离的浏览器会话和 DEV MCP Tunnel 可用。",
-  tagline: "在原生 Codex Harness 中运行 ChatGPT Web",
+  tagline: "在原生 Codex Harness 中运行 ChatGPT Web 和 Codax 工具",
   chooseLanguage: "选择语言",
   chooseLanguageHint: "稍后可以在设置中更改。",
   english: "English",
@@ -192,7 +192,7 @@ const zh: Record<keyof typeof en, string> = {
   browserReady: "浏览器已就绪",
   showBrowser: "显示 ChatGPT",
   hideBrowser: "隐藏 ChatGPT",
-  setupTitle: "设置 Codex Web GPT",
+  setupTitle: "设置 Codax",
   setupSubtitle: "完成三个检查，即可在原生 Codex 模型列表中使用 ChatGPT Web。",
   coreSetup: "核心设置",
   optional: "可选",

@@ -48,7 +48,7 @@ const BROWSER_DESCRIPTOR_PATH = path.join(CORE_HOME, "runtime", "launcher-browse
 const BROWSER_HELPER_PATH = app.isPackaged
   ? path.join(process.resourcesPath, "runtime", "app", "browser-helper.cjs")
   : path.join(SOURCE_ROOT, ".launcher-runtime", "browser-helper.cjs");
-const GITHUB_URL = "https://github.com/miuuyy/codex-chatgpt-web";
+const GITHUB_URL = "https://github.com/miziusLabs/Codex";
 const X_URL = "https://x.com/miu21590";
 const CONNECTORS_URL = "https://chatgpt.com/#settings/Plugins";
 const TUNNELS_URL = "https://platform.openai.com/settings/organization/tunnels";
@@ -57,11 +57,11 @@ const ALLOWED_EXTERNAL_URLS = new Set([GITHUB_URL, X_URL, CONNECTORS_URL, TUNNEL
 const PACKAGED_RENDERER_URL = pathToFileURL(path.join(__dirname, "..", "dist", "index.html")).href;
 const APP_ICON_PATH = path.join(__dirname, "..", "assets", "icon.png");
 
-process.env.CODEX_CHATGPT_WEB_HOME = CORE_HOME;
+process.env.CODAX_HOME = CORE_HOME;
 process.env.CODEX_HOME = LAUNCHER_PROFILE.codexHome;
 app.setName(LAUNCHER_PROFILE.displayName);
 if (process.platform === "win32") {
-  app.setAppUserModelId(IS_DEV_PROFILE ? "dev.codexwebgpt.launcher.dev" : "dev.codexwebgpt.launcher");
+  app.setAppUserModelId(IS_DEV_PROFILE ? "dev.codax.launcher.dev" : "dev.codax.launcher");
 }
 const launcherUserData = LAUNCHER_PROFILE.userData;
 fs.mkdirSync(launcherUserData, { recursive: true, mode: 0o700 });
@@ -530,7 +530,7 @@ function registerIpc({ logger, stateStore }) {
       buttons: chinese ? ["取消", "移除"] : ["Cancel", "Remove"],
       defaultId: 0,
       cancelId: 0,
-      title: chinese ? "移除 Codex Web GPT" : "Remove Codex Web GPT",
+      title: chinese ? "移除 Codax" : "Remove Codax",
       message: chinese
         ? "从 Codex 中移除 ChatGPT Web 模型并恢复此前的模型路由？"
         : "Remove the ChatGPT Web models from Codex and restore the previous model route?",
@@ -645,7 +645,7 @@ function registerIpc({ logger, stateStore }) {
     const date = new Date().toISOString().slice(0, 10);
     const result = await dialog.showSaveDialog(mainWindow, {
       title: "Export privacy-safe diagnostics",
-      defaultPath: path.join(app.getPath("documents"), `codex-web-gpt-diagnostics-${date}.jsonl`),
+      defaultPath: path.join(app.getPath("documents"), `codax-diagnostics-${date}.jsonl`),
       filters: [{ name: "JSON Lines", extensions: ["jsonl"] }],
     });
     if (result.canceled || !result.filePath) return null;
@@ -677,7 +677,7 @@ async function requestQuit() {
   try {
     const activeOperation = runtimeHost?.currentOperation() || browserHost?.currentOperation();
     if (activeOperation) {
-      throw new Error(`Wait for ${activeOperation} to finish before quitting Codex Web GPT`);
+      throw new Error(`Wait for ${activeOperation} to finish before quitting Codax`);
     }
     await runtimeSupervisor?.shutdown({ cancelActiveTurns: true, force: true });
     stopCatalogVerificationMonitor();
@@ -702,7 +702,7 @@ async function requestQuit() {
 async function start() {
   cdpPort = await findFreePort();
   if (process.platform === "linux") {
-    app.commandLine.appendSwitch("class", IS_DEV_PROFILE ? "codex-web-gpt-dev" : "codex-web-gpt");
+    app.commandLine.appendSwitch("class", IS_DEV_PROFILE ? "codax-dev" : "codax");
   }
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", String(cdpPort));
@@ -845,9 +845,9 @@ async function start() {
         + ` stderr=${JSON.stringify(versionResult.stderr.trim())})`,
       );
     }
-    const markerPath = process.env.CODEX_WEB_GPT_SMOKE_FILE?.trim();
+    const markerPath = process.env.CODAX_SMOKE_FILE?.trim();
     if (!markerPath || !path.isAbsolute(markerPath)) {
-      throw new Error("Packaged launcher smoke test requires an absolute CODEX_WEB_GPT_SMOKE_FILE");
+      throw new Error("Packaged launcher smoke test requires an absolute CODAX_SMOKE_FILE");
     }
     fs.mkdirSync(path.dirname(markerPath), { recursive: true });
     fs.writeFileSync(markerPath, `${JSON.stringify({
@@ -976,7 +976,7 @@ async function start() {
     if (runtime.status === "external" || runtime.status === "needs-setup") {
       const detail = runtime.detail || (
         runtime.status === "external"
-          ? "Another process owns the configured Codex Web GPT runtime"
+          ? "Another process owns the configured Codax runtime"
           : "The installed runtime configuration must be repaired from Setup"
       );
       publishOperation({
@@ -1019,7 +1019,7 @@ void start().catch((error) => {
     fs.appendFileSync(path.join(app.getPath("logs"), "launcher-fatal.log"), `${new Date().toISOString()} ${error?.stack || error}\n`);
   } catch {}
   try {
-    dialog.showErrorBox("Codex Web GPT could not start", message);
+    dialog.showErrorBox("Codax could not start", message);
   } catch {}
   app.exit(1);
 });

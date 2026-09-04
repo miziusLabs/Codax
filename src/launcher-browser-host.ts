@@ -4,7 +4,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from "playwrig
 import { expandUserPath } from "./config";
 import { processRunning } from "./process";
 
-export const LAUNCHER_BROWSER_HOST_KIND = "codex-web-gpt-launcher";
+export const LAUNCHER_BROWSER_HOST_KIND = "codax-launcher";
 export type LauncherBrowserHostProfile = "production" | "development";
 
 export class LauncherBrowserTurnCancelledError extends Error {
@@ -96,12 +96,12 @@ function assertDescriptorShape(value: unknown): LauncherBrowserHostDescriptor {
     throw new Error("Launcher browser descriptor helper script does not exist");
   }
   const expectedPartition = descriptor.profile === "development"
-    ? "persist:codex-web-gpt-dev-chatgpt"
-    : "persist:codex-web-gpt-chatgpt";
+    ? "persist:codax-dev-chatgpt"
+    : "persist:codax-chatgpt";
   if (descriptor.partition !== expectedPartition) {
     throw new Error("Launcher browser descriptor identifies an unexpected browser partition");
   }
-  if (descriptor.idleUrl !== "about:blank#codex-web-gpt-browser-host") {
+  if (descriptor.idleUrl !== "about:blank#codax-browser-host") {
     throw new Error("Launcher browser descriptor identifies an unexpected idle surface");
   }
   if (typeof descriptor.surfaceId !== "string" || !/^[A-Za-z0-9_-]{32}$/.test(descriptor.surfaceId)) {
@@ -182,8 +182,8 @@ export async function selectLauncherPage(
     const inspected = await Promise.all(candidates.map(async candidate => ({
       ...candidate,
       surfaceId: await candidate.page.evaluate(
-        () => (globalThis as typeof globalThis & { __CODEX_WEB_GPT_SURFACE_ID__?: unknown })
-          .__CODEX_WEB_GPT_SURFACE_ID__,
+        () => (globalThis as typeof globalThis & { __CODAX_SURFACE_ID__?: unknown })
+          .__CODAX_SURFACE_ID__,
       ).catch(() => undefined),
     })));
     const owned = inspected.filter(candidate => candidate.surfaceId === surfaceId);
