@@ -24,6 +24,14 @@ test("Motion animation features are split out of the renderer startup path", () 
   assert.doesNotMatch(appSource, /\bmotion\./);
 });
 
+test("launcher is English-only and exposes no language controls", () => {
+  assert.match(appSource, /import \{ copy, type Copy \} from "\.\/copy"/);
+  assert.doesNotMatch(appSource, /LanguageMenu|chooseLanguage|selectedLanguage|zh-CN|data-language/);
+  assert.doesNotMatch(stylesSource, /language-menu|welcome-option/);
+  assert.doesNotMatch(electronMain, /launcher:set-language|validateLanguage|zh-CN/);
+  assert.doesNotMatch(preloadSource, /setLanguage|launcher:set-language/);
+});
+
 test("native clicks reach browser tabs instead of the window drag region", () => {
   assert.match(appSource, /draggable=\{surface !== "browser"\}/);
   assert.match(appSource, /className=\{`app-titlebar\$\{draggable \? " draggable" : ""\}`\}/);

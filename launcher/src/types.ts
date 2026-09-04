@@ -1,10 +1,8 @@
-export type Language = "en" | "zh-CN";
 export type LauncherProfile = "production" | "development";
 export type Surface = "browser" | "setup" | "mcp" | "activity" | "settings";
 
 export interface LauncherState {
   version: 1;
-  language: Language | null;
   onboardingComplete: boolean;
   githubOpened: boolean;
   xOpened: boolean;
@@ -105,8 +103,7 @@ export interface LauncherSnapshot {
 
 export interface LauncherApi {
   snapshot(): Promise<LauncherSnapshot>;
-  setLanguage(language: Language): Promise<LauncherState>;
-  completeOnboarding(language: Language): Promise<LauncherState>;
+  completeOnboarding(): Promise<LauncherState>;
   openExternal(url: string): Promise<boolean>;
   setBrowserBounds(bounds: { x: number; y: number; width: number; height: number }): Promise<boolean>;
   setBrowserSurfaceActive(active: boolean): Promise<BrowserState>;

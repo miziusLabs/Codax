@@ -10,14 +10,13 @@ const {
   validateSidebarState,
 } = require("../electron/state.cjs");
 
-test("launcher state persists onboarding, language, and autostart atomically", () => {
+test("launcher state persists onboarding and autostart atomically", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "codax-launcher-state-"));
   const file = path.join(root, "state.json");
   try {
     const store = createStateStore(file);
     assert.deepEqual(store.read(), {
       version: 1,
-      language: null,
       onboardingComplete: false,
       githubOpened: false,
       xOpened: false,
@@ -33,7 +32,6 @@ test("launcher state persists onboarding, language, and autostart atomically", (
       sessionRefreshReminderAt: null,
     });
     store.update({
-      language: "zh-CN",
       onboardingComplete: true,
       keepRunningOnClose: false,
       browserSmokePassed: true,
@@ -42,7 +40,6 @@ test("launcher state persists onboarding, language, and autostart atomically", (
     });
     assert.deepEqual(createStateStore(file).read(), {
       version: 1,
-      language: "zh-CN",
       onboardingComplete: true,
       githubOpened: false,
       xOpened: false,
@@ -80,7 +77,7 @@ test("persisted sidebar corruption is repaired without changing the rest of laun
   try {
     fs.writeFileSync(file, JSON.stringify({
       version: 1,
-      language: "zh-CN",
+      language: "legacy",
       onboardingComplete: "yes",
       autoStart: "yes",
       bridgeEnabled: false,
@@ -96,7 +93,6 @@ test("persisted sidebar corruption is repaired without changing the rest of laun
     }));
     assert.deepEqual(createStateStore(file).read(), {
       version: 1,
-      language: "zh-CN",
       onboardingComplete: false,
       githubOpened: false,
       xOpened: false,
