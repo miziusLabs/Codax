@@ -194,6 +194,9 @@ bun run smoke:subagents
 bun run app:package
 ```
 
+`app:package` installs the locked launcher and runtime dependencies before building. Native
+installers are written to `launcher/artifacts/`; build on the operating system you are targeting.
+
 `dev:launcher` starts a second launcher profile under `~/.codax-dev`: separate Electron
 state, browser cookies/login, ChatGPT account, configuration, sandboxed `CODEX_HOME`, chats,
 diagnostics, broker, and tunnel profile. It can run beside the normal launcher and never starts a
