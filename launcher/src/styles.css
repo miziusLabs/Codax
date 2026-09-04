@@ -950,6 +950,67 @@ code {
   border-top: 1px solid var(--color-border);
 }
 
+.setup-progress {
+  margin: 8px 0 26px;
+}
+
+.setup-progress-track {
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-round);
+  background: var(--color-border-heavy);
+}
+
+.setup-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-text-success);
+  transition: width var(--duration-panel) var(--ease-enter);
+}
+
+.setup-progress-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.setup-progress-steps span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-disabled);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.setup-progress-steps span:nth-child(2) {
+  justify-content: center;
+  text-align: center;
+}
+
+.setup-progress-steps span:last-child {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.setup-progress-steps i {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-border-heavy);
+}
+
+.setup-progress-steps span.is-complete {
+  color: var(--color-text-tertiary);
+}
+
+.setup-progress-steps span.is-complete i {
+  background: var(--color-text-success);
+}
+
 .setup-row {
   display: grid;
   min-height: 82px;

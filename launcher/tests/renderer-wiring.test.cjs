@@ -198,16 +198,17 @@ test("saved ChatGPT authentication is refreshed before setup is presented", () =
   assert.ok(upgrade > refreshBarrier, "runtime upgrade must not inspect the browser before refresh settles");
   assert.ok(runtimeStart > upgrade, "configured runtime must start after any upgrade");
   assert.ok(routeConnect > runtimeStart, "Codex route must connect only after the runtime is healthy");
-  assert.match(appSource, /browser\?\.status === "loading" \? copy\.checkingSignIn/);
+  assert.match(appSource, /complete: browser\?\.authenticated === true, label: copy\.stepAccount/);
 });
 
-test("completed model setup remains a repeatable capability probe", () => {
-  assert.match(appSource, /<SetupRow[\s\S]*?onAction=\{install\}[\s\S]*?repeatable/);
-  assert.match(appSource, /complete && !repeatable/);
-  assert.match(
-    electronMain,
-    /!setupState\.coreSetupComplete[\s\S]*?smokePassedThisSession[\s\S]*?smokePassedForCurrentVersion\(setupState\)/,
-  );
+test("setup actions remain independent from the visual progress state", () => {
+  assert.match(appSource, /<SetupProgress[\s\S]*?copy\.stepAccount[\s\S]*?copy\.stepSmoke[\s\S]*?copy\.stepInstall/);
+  assert.match(appSource, /<SetupRow[\s\S]*?onAction=\{openLogin\}/);
+  assert.match(appSource, /<SetupRow[\s\S]*?onAction=\{smoke\}/);
+  assert.match(appSource, /<SetupRow[\s\S]*?onAction=\{install\}/);
+  assert.doesNotMatch(appSource, /disabled=\{busy \|\| !browser\?\.authenticated\}/);
+  assert.doesNotMatch(electronMain, /Run the browser smoke test before installing the Codex integration/);
+  assert.doesNotMatch(electronMain, /Sign in to ChatGPT before installing the Codex integration/);
 });
 
 test("session reminders expose dismissal and a real storage-clearing logout", () => {

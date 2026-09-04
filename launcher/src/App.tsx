@@ -460,7 +460,6 @@ function LauncherShell({
                 browser={browser}
                 copy={copy}
                 devProfile={devProfile}
-                operation={operation}
                 setError={setError}
                 showMcp={() => setSurface("mcp")}
                 snapshot={snapshot}
@@ -718,7 +717,6 @@ function SetupSurface({
   browser,
   copy,
   devProfile,
-  operation,
   setError,
   showMcp,
   snapshot,
@@ -728,28 +726,17 @@ function SetupSurface({
   browser: BrowserState | null;
   copy: Copy;
   devProfile: boolean;
-  operation: OperationState | null;
   setError: (error: string | null) => void;
   showMcp: () => void;
   snapshot: LauncherSnapshot;
   updateState: (state: LauncherState) => void;
 }) {
-  const [localBusy, setLocalBusy] = useState(false);
-  const busy = localBusy
-    || operation?.status === "running"
-    || browser?.status === "loading"
-    || browser?.status === "testing"
-    || browser?.status === "running";
   const run = async (action: () => Promise<void>) => {
-    if (busy) return;
-    setLocalBusy(true);
     setError(null);
     try {
       await action();
     } catch (cause) {
       setError(messageOf(cause));
-    } finally {
-      setLocalBusy(false);
     }
   };
 
@@ -769,43 +756,41 @@ function SetupSurface({
 
   return (
     <ContentSurface
-      eyebrow={copy.required}
-      subtitle={devProfile ? copy.devSetupSubtitle : copy.setupSubtitle}
+      eyebrow={devProfile ? copy.required : undefined}
+      subtitle={devProfile ? copy.devSetupSubtitle : undefined}
       title={devProfile ? copy.devSetupTitle : copy.setupTitle}
     >
-      <SectionHeading label={devProfile ? copy.devCoreSetup : copy.coreSetup} />
+      {devProfile ? <SectionHeading label={copy.devCoreSetup} /> : null}
+      <SetupProgress
+        steps={[
+          { complete: browser?.authenticated === true, label: copy.stepAccount },
+          { complete: snapshot.smokePassed, label: copy.stepSmoke },
+          { complete: snapshot.state.coreSetupComplete === true, label: devProfile ? copy.devStepInstall : copy.stepInstall },
+        ]}
+      />
       <div className="setup-list">
         <SetupRow
-          action={browser?.authenticated
-            ? copy.signedIn
-            : browser?.status === "loading" ? copy.checkingSignIn : copy.signIn}
+          action={copy.signIn}
           complete={browser?.authenticated === true}
           description={copy.stepAccountBody}
-          disabled={busy}
           index={1}
           onAction={openLogin}
           title={copy.stepAccount}
         />
         <SetupRow
-          action={snapshot.smokePassed ? copy.smokePassed : copy.runSmoke}
+          action={copy.runSmoke}
           complete={snapshot.smokePassed}
           description={copy.stepSmokeBody}
-          disabled={busy || !browser?.authenticated}
           index={2}
           onAction={smoke}
           title={copy.stepSmoke}
         />
         <SetupRow
-          action={snapshot.state.coreSetupComplete
-            ? devProfile ? copy.devReinstall : copy.reinstall
-            : devProfile ? copy.devInstall : copy.install}
+          action={devProfile ? copy.devInstall : copy.install}
           complete={snapshot.state.codexCatalogVerified === true}
           description={devProfile ? copy.devStepInstallBody : copy.stepInstallBody}
-          disabled={busy
-            || (!snapshot.smokePassed && snapshot.state.coreSetupComplete !== true)}
           index={3}
           onAction={install}
-          repeatable
           title={devProfile ? copy.devStepInstall : copy.stepInstall}
         />
       </div>
@@ -1345,19 +1330,15 @@ function SetupRow({
   action,
   complete,
   description,
-  disabled,
   index,
   onAction,
-  repeatable = false,
   title,
 }: {
   action: string;
   complete: boolean;
   description: string;
-  disabled: boolean;
   index: number;
   onAction: () => void;
-  repeatable?: boolean;
   title: string;
 }) {
   return (
@@ -1367,9 +1348,37 @@ function SetupRow({
         <strong>{title}</strong>
         <p>{description}</p>
       </div>
-      <SecondaryButton disabled={disabled || (complete && !repeatable)} onClick={onAction}>
+      <SecondaryButton onClick={onAction}>
         {action}
       </SecondaryButton>
+    </div>
+  );
+}
+
+function SetupProgress({ steps }: { steps: { complete: boolean; label: string }[] }) {
+  const completed = steps.filter((step) => step.complete).length;
+  const percent = Math.round((completed / steps.length) * 100);
+
+  return (
+    <div
+      aria-label={`${copy.setupProgress}: ${completed} / ${steps.length}`}
+      aria-valuemax={steps.length}
+      aria-valuemin={0}
+      aria-valuenow={completed}
+      className="setup-progress"
+      role="progressbar"
+    >
+      <div className="setup-progress-track" aria-hidden="true">
+        <span style={{ width: `${percent}%` }} />
+      </div>
+      <div className="setup-progress-steps" aria-hidden="true">
+        {steps.map((step) => (
+          <span className={step.complete ? "is-complete" : ""} key={step.label}>
+            <i />
+            {step.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

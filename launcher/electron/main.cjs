@@ -546,23 +546,6 @@ function registerIpc({ logger, stateStore }) {
     return { cancelled: false, state };
   });
   handle("launcher:setup-core", async () => {
-    const browser = await browserHost.probeAuthentication();
-    if (!browser.authenticated) {
-      throw new Error(
-        IS_DEV_PROFILE
-          ? "Sign in to the isolated DEV ChatGPT profile before configuring the harness"
-          : "Sign in to ChatGPT before installing the Codex integration",
-      );
-    }
-    const setupState = stateStore.read();
-    if (!setupState.coreSetupComplete
-      && !(smokePassedThisSession || smokePassedForCurrentVersion(setupState))) {
-      throw new Error(
-        IS_DEV_PROFILE
-          ? "Run the browser smoke test before configuring the DEV harness"
-          : "Run the browser smoke test before installing the Codex integration",
-      );
-    }
     const result = IS_DEV_PROFILE ? await runtimeHost.setupDevCore() : await runtimeHost.setupCore();
     stateStore.update({
       coreSetupComplete: true,
