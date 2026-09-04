@@ -356,11 +356,6 @@ async function loadRenderer(window) {
   await window.loadFile(path.join(__dirname, "..", "dist", "index.html"));
 }
 
-function validateLanguage(value) {
-  if (value !== "en" && value !== "zh-CN") throw new Error("Language must be en or zh-CN");
-  return value;
-}
-
 function validateBounds(value) {
   if (!value || typeof value !== "object") throw new Error("Browser bounds are required");
   for (const key of ["x", "y", "width", "height"]) {
@@ -394,12 +389,11 @@ function registerIpc({ logger, stateStore }) {
     operation: lastOperation,
   }));
 
-  handle("launcher:set-language", (_event, language) => stateStore.update({ language: validateLanguage(language) }));
-  handle("launcher:complete-onboarding", (_event, language) => {
+  handle("launcher:complete-onboarding", () => {
     const current = stateStore.read();
     if (current.autoStart) setAutostart(app, true);
-    const next = stateStore.update({ language: validateLanguage(language), onboardingComplete: true });
-    logger.info("launcher.onboarding_completed", { language: next.language });
+    const next = stateStore.update({ onboardingComplete: true });
+    logger.info("launcher.onboarding_completed");
     return next;
   });
 
@@ -523,20 +517,14 @@ function registerIpc({ logger, stateStore }) {
   });
   handle("launcher:uninstall-integration", async () => {
     if (IS_DEV_PROFILE) throw new Error("DEV profile has no Codex integration to remove");
-    const language = stateStore.read().language;
-    const chinese = language === "zh-CN";
     const confirmation = await dialog.showMessageBox(mainWindow, {
       type: "warning",
-      buttons: chinese ? ["取消", "移除"] : ["Cancel", "Remove"],
+      buttons: ["Cancel", "Remove"],
       defaultId: 0,
       cancelId: 0,
-      title: chinese ? "移除 Codex Web GPT" : "Remove Codex Web GPT",
-      message: chinese
-        ? "从 Codex 中移除 ChatGPT Web 模型并恢复此前的模型路由？"
-        : "Remove the ChatGPT Web models from Codex and restore the previous model route?",
-      detail: chinese
-        ? "启动器中的 ChatGPT 登录 profile 会保留。Codex 需要重启一次。"
-        : "The launcher's ChatGPT login profile will be preserved. Codex must be restarted once.",
+      title: "Remove Codex Web GPT",
+      message: "Remove the ChatGPT Web models from Codex and restore the previous model route?",
+      detail: "The launcher's ChatGPT login profile will be preserved. Codex must be restarted once.",
       noLink: true,
     });
     if (confirmation.response !== 1) return { cancelled: true };
@@ -733,7 +721,6 @@ async function start() {
   const stateStore = createStateStore(path.join(app.getPath("userData"), "launcher-state.json"));
   if (IS_DEV_PROFILE && !stateStore.read().onboardingComplete) {
     stateStore.update({
-      language: stateStore.read().language || "en",
       onboardingComplete: true,
       autoStart: false,
     });
