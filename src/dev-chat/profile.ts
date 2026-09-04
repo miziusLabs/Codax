@@ -45,13 +45,13 @@ export function resolveDevProfilePaths({
   homeDirectory?: string;
 } = {}): DevProfilePaths {
   const home = resolve(expandUserPath(
-    environment.CODEX_WEB_GPT_DEV_HOME?.trim() || join(homeDirectory, ".codex-chatgpt-web-dev"),
+    environment.CODAX_DEV_HOME?.trim() || join(homeDirectory, ".codax-dev"),
   ));
   const productionHome = resolve(expandUserPath(
-    environment.CODEX_CHATGPT_WEB_HOME?.trim() || join(homeDirectory, ".codex-chatgpt-web"),
+    environment.CODAX_HOME?.trim() || join(homeDirectory, ".codax"),
   ));
   if (home === productionHome) {
-    throw new Error("DEV profile home must differ from the production codex-chatgpt-web home");
+    throw new Error("DEV profile home must differ from the production codax home");
   }
   const launcherUserData = join(home, "launcher");
   return {
@@ -67,8 +67,8 @@ export function resolveDevProfilePaths({
 }
 
 export function activateDevProfileEnvironment(paths = resolveDevProfilePaths()): DevProfilePaths {
-  process.env.CODEX_WEB_GPT_DEV_HOME = paths.home;
-  process.env.CODEX_CHATGPT_WEB_HOME = paths.home;
+  process.env.CODAX_DEV_HOME = paths.home;
+  process.env.CODAX_HOME = paths.home;
   process.env.CODEX_HOME = paths.codexHome;
   if (getConfigPath() !== paths.configPath) {
     throw new Error("DEV profile environment did not resolve to its isolated configuration path");
@@ -96,29 +96,29 @@ export function installedLauncherCandidates({
   platform?: NodeJS.Platform;
   windowsInstallLocation?: string;
 } = {}): string[] {
-  const override = environment.CODEX_WEB_GPT_LAUNCHER_EXECUTABLE?.trim();
+  const override = environment.CODAX_LAUNCHER_EXECUTABLE?.trim();
   const candidates = override ? [expandUserPath(override)] : [];
   const targetPath = platform === "win32" ? win32 : posix;
   if (platform === "darwin") {
     candidates.push(
-      "/Applications/Codex Web GPT.app/Contents/MacOS/Codex Web GPT",
-      posix.join(homeDirectory, "Applications", "Codex Web GPT.app", "Contents", "MacOS", "Codex Web GPT"),
+      "/Applications/Codax.app/Contents/MacOS/Codax",
+      posix.join(homeDirectory, "Applications", "Codax.app", "Contents", "MacOS", "Codax"),
     );
   } else if (platform === "win32") {
     const registeredLocation = windowsInstallLocation?.trim()
       || (process.platform === "win32" ? registeredWindowsLauncherInstallLocation() : undefined);
     if (registeredLocation && win32.isAbsolute(registeredLocation)) {
-      candidates.push(win32.join(registeredLocation, "Codex Web GPT.exe"));
+      candidates.push(win32.join(registeredLocation, "Codax.exe"));
     } else {
       const localAppData = environment.LOCALAPPDATA?.trim();
       if (localAppData) {
-        candidates.push(win32.join(localAppData, "Programs", "Codex Web GPT", "Codex Web GPT.exe"));
+        candidates.push(win32.join(localAppData, "Programs", "Codax", "Codax.exe"));
       }
     }
   } else if (platform === "linux") {
-    candidates.push(posix.join(homeDirectory, ".local", "bin", "codex-web-gpt"));
+    candidates.push(posix.join(homeDirectory, ".local", "bin", "codax"));
     for (const entry of (environment.PATH || "").split(":").filter(Boolean)) {
-      candidates.push(posix.join(entry, "codex-web-gpt"));
+      candidates.push(posix.join(entry, "codax"));
     }
   }
   return [...new Set(candidates.map(candidate => targetPath.resolve(candidate)))];
@@ -129,7 +129,7 @@ export function findInstalledLauncherExecutable(options: Parameters<typeof insta
   const executable = candidates.find(executableFile);
   if (executable) return executable;
   throw new Error(
-    "Installed Codex Web GPT launcher was not found. Install it first or set CODEX_WEB_GPT_LAUNCHER_EXECUTABLE to its absolute executable path."
+    "Installed Codax launcher was not found. Install it first or set CODAX_LAUNCHER_EXECUTABLE to its absolute executable path."
       + ` Checked: ${candidates.join(", ") || "no platform candidates"}`,
   );
 }
@@ -139,10 +139,10 @@ export function devLauncherEnvironment(
   environment: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
   const childEnvironment = { ...environment };
-  delete childEnvironment.CODEX_CHATGPT_WEB_HOME;
+  delete childEnvironment.CODAX_HOME;
   delete childEnvironment.CODEX_HOME;
-  delete childEnvironment.CODEX_WEB_GPT_LAUNCHER_DATA_DIR;
-  childEnvironment.CODEX_WEB_GPT_DEV_HOME = paths.home;
+  delete childEnvironment.CODAX_LAUNCHER_DATA_DIR;
+  childEnvironment.CODAX_DEV_HOME = paths.home;
   return childEnvironment;
 }
 

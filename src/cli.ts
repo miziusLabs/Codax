@@ -26,29 +26,29 @@ import { getTunnelServiceStatus, restartTunnelService, startTunnelService, stopT
 import { VERSION } from "./version";
 import { runDevCommand } from "./dev-chat/cli";
 
-const HELP = `codex-chatgpt-web ${VERSION}
+const HELP = `codax ${VERSION}
 
-Focused ChatGPT web-backed models for the native Codex harness.
+Extensible local utilities for the native Codex harness. Current capability: ChatGPT web-backed models.
 
 Usage:
-  codex-chatgpt-web setup --browser-only [options]
-  codex-chatgpt-web setup --full --tunnel-id ID --runtime-key-file PATH [options]
-  codex-chatgpt-web login
-  codex-chatgpt-web doctor [--json]
-  codex-chatgpt-web route <status|connect|disconnect>
-  codex-chatgpt-web subagents <status|compatibility-v1|native>
-  codex-chatgpt-web browser check
-  codex-chatgpt-web dev launcher
-  codex-chatgpt-web dev status [--json]
-  codex-chatgpt-web dev setup <--browser-only|--full> [options]
-  codex-chatgpt-web dev chat NAME [--model MODEL] [MESSAGE]
-  codex-chatgpt-web dev list
-  codex-chatgpt-web serve
-  codex-chatgpt-web mcp [--broker-socket PATH]
-  codex-chatgpt-web service <status|install|start|restart|stop|cancel-turns>
-  codex-chatgpt-web tunnel <status|start|restart|stop|key-import>
-  codex-chatgpt-web open <tunnels|runtime-keys|connectors>
-  codex-chatgpt-web uninstall --yes
+  codax setup --browser-only [options]
+  codax setup --full --tunnel-id ID --runtime-key-file PATH [options]
+  codax login
+  codax doctor [--json]
+  codax route <status|connect|disconnect>
+  codax subagents <status|compatibility-v1|native>
+  codax browser check
+  codax dev launcher
+  codax dev status [--json]
+  codax dev setup <--browser-only|--full> [options]
+  codax dev chat NAME [--model MODEL] [MESSAGE]
+  codax dev list
+  codax serve
+  codax mcp [--broker-socket PATH]
+  codax service <status|install|start|restart|stop|cancel-turns>
+  codax tunnel <status|start|restart|stop|key-import>
+  codax open <tunnels|runtime-keys|connectors>
+  codax uninstall --yes
 
 Setup options:
   --browser-only               Account-eligible Web models, full context/images, no local tools or tunnel
@@ -70,7 +70,7 @@ Setup options:
   --acknowledge-unofficial     Accept the one-time unofficial-browser-automation notice
 
 Global:
-  --home PATH                  Override ~/.codex-chatgpt-web
+  --home PATH                  Override ~/.codax
   -h, --help
   -v, --version
 `;
@@ -126,9 +126,9 @@ function assertNoArgs(args: string[]): void {
 }
 
 function authorizeLauncherControl(operation: string): void {
-  const descriptorPath = process.env.CODEX_CHATGPT_WEB_BROWSER_HOST_DESCRIPTOR?.trim();
-  const supplied = process.env.CODEX_WEB_GPT_LAUNCHER_CONTROL_TOKEN?.trim();
-  delete process.env.CODEX_WEB_GPT_LAUNCHER_CONTROL_TOKEN;
+  const descriptorPath = process.env.CODAX_BROWSER_HOST_DESCRIPTOR?.trim();
+  const supplied = process.env.CODAX_LAUNCHER_CONTROL_TOKEN?.trim();
+  delete process.env.CODAX_LAUNCHER_CONTROL_TOKEN;
   if (!descriptorPath || !supplied) {
     throw new Error(`Launcher-controlled ${operation} requires a live launcher authorization`);
   }
@@ -144,7 +144,7 @@ async function loginCommand(args: string[]): Promise<void> {
   assertNoArgs(args);
   const config = loadConfig();
   if (config.browserHost === "launcher") {
-    throw new Error("ChatGPT login is owned by the launcher; open Codex Web GPT and use its Sign in step");
+    throw new Error("ChatGPT login is owned by the launcher; open Codax and use its Sign in step");
   }
   const result = await loginToChatGpt(config);
   stdout.write(`ChatGPT login stored at ${result.storageStatePath}\n`);
@@ -356,7 +356,7 @@ async function uninstallCommand(args: string[]): Promise<void> {
   const config = existsSync(getConfigPath()) ? loadConfig() : undefined;
   if (config?.browserHost === "launcher" && !launcherControl) {
     throw new Error(
-      "Launcher-owned integration must be removed from Codex Web GPT Settings so the active runtime can be drained safely.",
+      "Launcher-owned integration must be removed from Codax Settings so the active runtime can be drained safely.",
     );
   }
   if (!config && process.platform === "darwin" && getServiceStatus().installed) {
@@ -377,7 +377,7 @@ async function uninstallCommand(args: string[]): Promise<void> {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const home = takeOption(args, "--home");
-  if (home) process.env.CODEX_CHATGPT_WEB_HOME = home;
+  if (home) process.env.CODAX_HOME = home;
   if (takeFlag(args, "--help") || takeFlag(args, "-h")) {
     stdout.write(HELP);
     return;
@@ -388,7 +388,7 @@ async function main(): Promise<void> {
   }
   const command = args.shift() ?? "help";
   if (command === "dev" && home) {
-    throw new Error("--home does not apply to DEV mode; use CODEX_WEB_GPT_DEV_HOME for an explicit isolated DEV profile");
+    throw new Error("--home does not apply to DEV mode; use CODAX_DEV_HOME for an explicit isolated DEV profile");
   }
   if (command === "help") stdout.write(HELP);
   else if (command === "setup") await setupCommand(args);
@@ -412,7 +412,7 @@ async function main(): Promise<void> {
     assertNoArgs(args);
     const config = loadConfig();
     const server = startServer(config);
-    stdout.write(`codex-chatgpt-web ${VERSION} listening on http://${config.host}:${server.port}/v1 (${config.mode})\n`);
+    stdout.write(`codax ${VERSION} listening on http://${config.host}:${server.port}/v1 (${config.mode})\n`);
     await new Promise<void>(() => {});
   } else if (command === "dev") await runDevCommand(args);
   else if (command === "mcp") await runChatGptMcpMain(args);
@@ -424,6 +424,6 @@ async function main(): Promise<void> {
 }
 
 main().catch(error => {
-  process.stderr.write(`codex-chatgpt-web: ${error instanceof Error ? error.message : String(error)}\n`);
+  process.stderr.write(`codax: ${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;
 });

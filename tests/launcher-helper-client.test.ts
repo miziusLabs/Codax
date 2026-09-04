@@ -69,8 +69,8 @@ test("Bun daemon streams a prepared browser turn through the persistent Node hel
       token: "launcher-control-token-0123456789abcdefghijklmnop",
     },
     helper: { executable: process.execPath, script: descriptorHelper },
-    partition: "persist:codex-web-gpt-chatgpt",
-    idleUrl: "about:blank#codex-web-gpt-browser-host",
+    partition: "persist:codax-chatgpt",
+    idleUrl: "about:blank#codax-browser-host",
     surfaceId: "launcher_surface_id_0123456789AB",
     createdAt: new Date().toISOString(),
   })}\n`, { mode: 0o600 });

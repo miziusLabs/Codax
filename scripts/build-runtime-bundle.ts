@@ -17,9 +17,9 @@ if (Bun.version !== expectedBunVersion) {
 }
 
 function embeddedBunExecutable(): string {
-  const configured = process.env.CODEX_CHATGPT_WEB_EMBEDDED_BUN;
+  const configured = process.env.CODAX_EMBEDDED_BUN;
   if (!configured) return realpathSync(process.execPath);
-  if (!isAbsolute(configured)) throw new Error("CODEX_CHATGPT_WEB_EMBEDDED_BUN must be an absolute path");
+  if (!isAbsolute(configured)) throw new Error("CODAX_EMBEDDED_BUN must be an absolute path");
   const executable = realpathSync(configured);
   const version = Bun.spawnSync([executable, "--version"], { stdout: "pipe", stderr: "pipe" });
   if (version.exitCode !== 0) {
@@ -92,12 +92,12 @@ const bunName = process.platform === "win32" ? "bun.exe" : "bun";
 cpSync(embeddedBunExecutable(), join(runtimeDir, bunName));
 if (process.platform !== "win32") chmodSync(join(runtimeDir, bunName), 0o755);
 
-const launcherName = process.platform === "win32" ? "codex-chatgpt-web.cmd" : "codex-chatgpt-web";
+const launcherName = process.platform === "win32" ? "codax.cmd" : "codax";
 const launcher = process.platform === "win32" ? `@echo off
 setlocal
 chcp 65001 >nul
 set "ROOT=%~dp0.."
-set "CODEX_CHATGPT_WEB_LAUNCHER=%~f0"
+set "CODAX_LAUNCHER=%~f0"
 "%ROOT%\\runtime\\bun.exe" "%ROOT%\\app\\cli.js" %*
 ` : `#!/bin/sh
 set -eu
@@ -116,7 +116,7 @@ while [ -L "$script" ]; do
 done
 bin_dir="$(CDPATH= cd -- "$(dirname "$script")" && pwd -P)"
 root="$(CDPATH= cd -- "$bin_dir/.." && pwd -P)"
-export CODEX_CHATGPT_WEB_LAUNCHER="$invoked"
+export CODAX_LAUNCHER="$invoked"
 exec "$root/runtime/bun" "$root/app/cli.js" "$@"
 `;
 writeFileSync(join(binDir, launcherName), launcher, process.platform === "win32" ? undefined : { mode: 0o755 });

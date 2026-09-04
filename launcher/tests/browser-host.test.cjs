@@ -22,7 +22,7 @@ const {
 } = require("../electron/browser-host.cjs");
 
 test("managed ChatGPT chrome hides sidebar and account controls", () => {
-  assert.match(CHATGPT_VIEWPORT_CSS, /data-codex-web-gpt-sidebar/);
+  assert.match(CHATGPT_VIEWPORT_CSS, /data-codax-sidebar/);
   assert.match(CHATGPT_VIEWPORT_CSS, /accounts-profile-button/);
   assert.match(CHATGPT_VIEWPORT_CSS, /open-sidebar-button/);
   assert.match(CHATGPT_VIEWPORT_CSS, /close-sidebar-button/);
@@ -1074,14 +1074,14 @@ test("launcher delegates every ChatGPT model and turn operation to the shared br
     setState: patch => calls.push(["state", patch]),
     runBrowserHelperOperation: async options => {
       calls.push(["helper", options]);
-      return { type: "result", value: { effort: "High", response: "CODEX WEB GPT READY" } };
+      return { type: "result", value: { effort: "High", response: "CODAX READY" } };
     },
   });
 
   assert.deepEqual(await BrowserHost.prototype.runSmokeTest.call(fixture), {
     ok: true,
     effort: "High",
-    response: "CODEX WEB GPT READY",
+    response: "CODAX READY",
   });
   const helperCall = calls.find(call => call[0] === "helper")[1];
   assert.equal(helperCall.operation, "smoke");
@@ -1320,7 +1320,7 @@ test("removing the final turn tab hides an uninitialized idle host instead of ex
     closedTurnOwners: new Map(),
     selectedTabId: tab.id,
     window: { contentView: { removeChildView: () => calls.push("view-remove") } },
-    view: { webContents: { getURL: () => "about:blank#codex-web-gpt-browser-host" } },
+    view: { webContents: { getURL: () => "about:blank#codax-browser-host" } },
     syncViewVisibility() {},
     hide: () => calls.push("hide"),
     snapshot: () => ({ tabs: [] }),
@@ -1395,7 +1395,7 @@ test("launcher session refresh resolves persisted authentication before setup ac
     },
     view: {
       webContents: {
-        getURL: () => "about:blank#codex-web-gpt-browser-host",
+        getURL: () => "about:blank#codax-browser-host",
         loadURL: async (url) => calls.push(["load", url]),
       },
     },

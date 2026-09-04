@@ -223,7 +223,7 @@ class RuntimeHost {
     if (descriptor?.pid !== process.pid || typeof token !== "string" || !/^[A-Za-z0-9_-]{40,}$/.test(token)) {
       throw new Error("Launcher browser ownership descriptor does not belong to this launcher process");
     }
-    return { CODEX_WEB_GPT_LAUNCHER_CONTROL_TOKEN: token };
+    return { CODAX_LAUNCHER_CONTROL_TOKEN: token };
   }
 
   devSetupEnvironment(environment = process.env) {
@@ -231,10 +231,10 @@ class RuntimeHost {
       throw new Error("DEV setup environment requires the isolated DEV launcher");
     }
     const childEnvironment = { ...environment };
-    delete childEnvironment.CODEX_CHATGPT_WEB_HOME;
+    delete childEnvironment.CODAX_HOME;
     delete childEnvironment.CODEX_HOME;
-    delete childEnvironment.CODEX_WEB_GPT_LAUNCHER_DATA_DIR;
-    childEnvironment.CODEX_WEB_GPT_DEV_HOME = this.coreHome;
+    delete childEnvironment.CODAX_LAUNCHER_DATA_DIR;
+    childEnvironment.CODAX_DEV_HOME = this.coreHome;
     return childEnvironment;
   }
 
@@ -286,11 +286,11 @@ class RuntimeHost {
       path.join(this.codexHome, "config.toml"),
       path.join(this.codexHome, "models_cache.json"),
       path.join(coreHome, "secrets", "tunnel-runtime.key"),
-      path.join(coreHome, "tunnel", "profiles", "codex-chatgpt-web.yaml"),
+      path.join(coreHome, "tunnel", "profiles", "codax.yaml"),
     ]);
     if (snapshot.owner === "external" && this.platform === "darwin") {
-      paths.add(path.join(this.launchAgentsDir, "io.github.codex-chatgpt-web.daemon.plist"));
-      paths.add(path.join(this.launchAgentsDir, "io.github.codex-chatgpt-web.tunnel.plist"));
+      paths.add(path.join(this.launchAgentsDir, "io.github.codax.daemon.plist"));
+      paths.add(path.join(this.launchAgentsDir, "io.github.codax.tunnel.plist"));
     }
     const tunnel = snapshot.config?.tunnel;
     if (tunnel && typeof tunnel === "object") {
@@ -417,7 +417,7 @@ class RuntimeHost {
           ? { ...options.environment }
           : { ...process.env };
         Object.assign(environment, {
-          CODEX_CHATGPT_WEB_BROWSER_HOST_DESCRIPTOR: this.browserDescriptorPath,
+          CODAX_BROWSER_HOST_DESCRIPTOR: this.browserDescriptorPath,
           ...(options.env || {}),
         });
         const child = spawn(invocation.executable, invocation.args, {
@@ -757,7 +757,7 @@ class RuntimeHost {
           embedded: true,
           env: this.launcherControlEnvironment(),
           message: "Restoring the previous Codex route",
-          successMessage: "Codex Web GPT integration removed",
+          successMessage: "Codax integration removed",
           timeoutMs: UNINSTALL_TIMEOUT_MS,
         });
         const verified = await this.bridgeStatus(name);

@@ -8,7 +8,7 @@ import { defaultConfig } from "../src/config";
 
 test("login starts with normal Chrome and captures state in a headed Keychain-aware context", async () => {
   if (process.platform === "win32") return;
-  const root = mkdtempSync(join(tmpdir(), "codex-chatgpt-web-login-"));
+  const root = mkdtempSync(join(tmpdir(), "codax-login-"));
   const executable = join(root, "fake-chrome");
   const argsLog = join(root, "args.log");
   writeFileSync(executable, "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$CODEX_LOGIN_ARG_LOG\"\n", { mode: 0o700 });
@@ -36,7 +36,7 @@ test("login starts with normal Chrome and captures state in a headed Keychain-aw
 });
 
 test("a storage-state file is not trusted without a verification marker", () => {
-  const root = mkdtempSync(join(tmpdir(), "codex-chatgpt-web-login-state-"));
+  const root = mkdtempSync(join(tmpdir(), "codax-login-state-"));
   try {
     const config = defaultConfig("browser-only");
     config.storageStatePath = join(root, "storage-state.json");

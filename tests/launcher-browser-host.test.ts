@@ -43,9 +43,9 @@ function descriptorFile(
       script: import.meta.path,
     },
     partition: profile === "development"
-      ? "persist:codex-web-gpt-dev-chatgpt"
-      : "persist:codex-web-gpt-chatgpt",
-    idleUrl: "about:blank#codex-web-gpt-browser-host",
+      ? "persist:codax-dev-chatgpt"
+      : "persist:codax-chatgpt",
+    idleUrl: "about:blank#codax-browser-host",
     surfaceId: "launcher_surface_id_0123456789AB",
     createdAt: new Date().toISOString(),
   })}\n`, { mode: 0o600 });
@@ -297,7 +297,7 @@ test("launcher profile checks reject cross-profile browser ownership", async () 
   const path = descriptorFile("http://127.0.0.1:39111", "development");
   expect(readLauncherBrowserHostDescriptor(path)).toMatchObject({
     profile: "development",
-    partition: "persist:codex-web-gpt-dev-chatgpt",
+    partition: "persist:codax-dev-chatgpt",
   });
   await expect(inspectLauncherBrowserHost(path, { expectedProfile: "production", timeoutMs: 5 }))
     .rejects.toThrow("belongs to development");
@@ -310,7 +310,7 @@ test("launcher page selection uses the owned surface marker instead of URL order
     evaluate: async () => "another_surface_id_0123456789ABC",
   } as unknown as Page;
   const ownedPage = {
-    url: () => "about:blank#codex-web-gpt-browser-host",
+    url: () => "about:blank#codax-browser-host",
     evaluate: async () => descriptor.surfaceId,
   } as unknown as Page;
   const context = {

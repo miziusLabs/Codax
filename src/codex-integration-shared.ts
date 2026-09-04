@@ -5,18 +5,18 @@ import { dirname, join, resolve } from "node:path";
 import type { AppConfig, SubagentProtocol } from "./config";
 import { atomicWriteFile, expandUserPath, getConfigDir } from "./config";
 
-export const MANAGED_COMMENT = "# Managed by codex-chatgpt-web; `codex-chatgpt-web uninstall` restores prior values.";
+export const MANAGED_COMMENT = "# Managed by codax; `codax uninstall` restores prior values.";
 export const MANAGED_REMOTE_COMPACTION_LINE =
-  "remote_compaction_v2 = false # Managed by codex-chatgpt-web: bounds retained Web image history.";
+  "remote_compaction_v2 = false # Managed by codax: bounds retained Web image history.";
 export const MANAGED_MULTI_AGENT_LINE =
-  "multi_agent = true # Managed by codex-chatgpt-web: enables routed Web subagents.";
+  "multi_agent = true # Managed by codax: enables routed Web subagents.";
 export const MANAGED_MULTI_AGENT_V2_LINE =
-  "multi_agent_v2 = false # Managed by codex-chatgpt-web: keeps routed Web subagent payloads readable.";
+  "multi_agent_v2 = false # Managed by codax: keeps routed Web subagent payloads readable.";
 export const MANAGED_MULTI_AGENT_V2_TABLE_LINE =
-  "enabled = false # Managed by codex-chatgpt-web: keeps routed Web subagent payloads readable.";
+  "enabled = false # Managed by codax: keeps routed Web subagent payloads readable.";
 export const MIN_COMPATIBILITY_V1_AGENT_DEPTH = 2;
 export function managedAgentMaxDepthLine(value: number): string {
-  return `max_depth = ${value} # Managed by codex-chatgpt-web: allows nested routed Web subagents in Compatibility V1.`;
+  return `max_depth = ${value} # Managed by codax: allows nested routed Web subagents in Compatibility V1.`;
 }
 
 export interface PreviousAssignment {
