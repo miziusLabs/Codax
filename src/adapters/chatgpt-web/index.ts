@@ -382,7 +382,10 @@ export function createChatGptWebAdapter(
     const prepareWith = async (input: CodexParsedRequest) => {
       const turnToken = activeToken ?? await broker.register(
         environment,
-        timeoutMs === undefined ? undefined : timeoutMs + 60_000,
+        // The browser timeout measures the whole ChatGPT exchange, but the first native MCP
+        // action can arrive after the model has finished composing its initial response. Keep a
+        // larger handoff window so slow local tool startup does not race token expiry.
+        timeoutMs === undefined ? undefined : timeoutMs + 5 * 60_000,
         traceId,
       );
       activeToken = turnToken;
