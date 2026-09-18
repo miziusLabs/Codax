@@ -2187,6 +2187,7 @@ export class ChatGptBrowserWorker {
     captureDiagnostic?: (checkpoint: string) => Promise<void>,
     abortSignal?: AbortSignal,
     externalProgress?: ChatGptExternalTurnProgress,
+    submissionDispatch?: { onDispatched: () => void },
     submissionLifecycle?: Pick<BrowserTurn, "onSendActivated" | "onSubmitted">,
   ): Promise<ChatGptSubmissionEvidence> {
     const composer = await this.activeComposer(page);
@@ -2212,6 +2213,7 @@ export class ChatGptBrowserWorker {
     const initialToolBatchRevision = externalProgress?.snapshot().lastToolBatchRevision ?? 0;
     await submissionLifecycle?.onSendActivated?.();
     await sendButton.press("Enter");
+    submissionDispatch?.onDispatched();
     const evidence = await this.waitForSubmissionAccepted(
       page,
       baseline,
@@ -2221,6 +2223,17 @@ export class ChatGptBrowserWorker {
     );
     submissionLifecycle?.onSubmitted?.();
     return evidence;
+  }
+
+  private async stopActiveChatGptGeneration(page: Page): Promise<void> {
+    if (page.isClosed()) return;
+    const stop = page.locator(CHATGPT_STOP_BUTTON_SELECTOR).last();
+    if (!await stop.isVisible().catch(() => false)) {
+      await stop.waitFor({ state: "visible", timeout: 2_000 }).catch(() => {});
+    }
+    if (await stop.isVisible().catch(() => false)) {
+      await stop.press("Enter").catch(() => {});
+    }
   }
 
   private async resetCompactionComposerForRetry(
@@ -2962,6 +2975,7 @@ export class ChatGptBrowserWorker {
     let turnConnection: Browser | undefined;
     let managedPage: Page | undefined;
     let diagnosticPage: Page | undefined;
+    let submissionDispatched = false;
     try {
       if (turn.abortSignal?.aborted) throw new DOMException("ChatGPT web turn aborted", "AbortError");
       const estimatedInputTokens = estimateCompiledChatGptWebInputTokens(prepared, turn.modelId);
@@ -3138,6 +3152,7 @@ export class ChatGptBrowserWorker {
           checkpoint => diagnostics.capture(page, checkpoint),
           turn.abortSignal ? AbortSignal.any([stageSignal, turn.abortSignal]) : stageSignal,
           turn.externalProgress,
+          { onDispatched: () => { submissionDispatched = true; } },
           turn,
         ),
       );
@@ -3185,8 +3200,6 @@ export class ChatGptBrowserWorker {
           throw chatGptBrowserTabClosedError();
         }
         if (turn.abortSignal?.aborted) {
-          const stop = page.locator(CHATGPT_STOP_BUTTON_SELECTOR).last();
-          if (await stop.isVisible().catch(() => false)) await stop.press("Enter").catch(() => {});
           throw new DOMException("ChatGPT web turn aborted", "AbortError");
         }
         if (deadline !== undefined && Date.now() >= deadline) {
@@ -3357,6 +3370,9 @@ export class ChatGptBrowserWorker {
       );
       return finalText;
     } catch (error) {
+      if (turn.abortSignal?.aborted && submissionDispatched && diagnosticPage && !diagnosticPage.isClosed()) {
+        await this.stopActiveChatGptGeneration(diagnosticPage);
+      }
       console.error(
         `[chatgpt-web] browser turn ${turn.traceId} failed:`
         + ` ${redactChatGptUiDiagnostic(error instanceof Error ? error.message : String(error))}`,
