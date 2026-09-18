@@ -1,0 +1,169 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+      - package-lock.json
+      - launcher/package.json
+      - launcher/package-lock.json
+      - src/version.ts
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      bumped: ${{ steps.version.outputs.bumped }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Check out the version bump
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read and validate the version
+        id: version
+        shell: bash
+        run: |
+          current=$(node -p "require('./package.json').version")
+          launcher=$(node -p "require('./launcher/package.json').version")
+
+          if [[ "$current" != "$launcher" ]]; then
+            echo "Version mismatch: package=$current launcher=$launcher" >&2
+            exit 1
+          fi
+
+          before="${{ github.event.before }}"
+          if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
+            previous=$(git show HEAD^:package.json 2>/dev/null | node -e 'let data=""; process.stdin.on("data", chunk => data += chunk); process.stdin.on("end", () => console.log(JSON.parse(data).version));' || true)
+          else
+            previous=$(git show "$before:package.json" 2>/dev/null | node -e 'let data=""; process.stdin.on("data", chunk => data += chunk); process.stdin.on("end", () => console.log(JSON.parse(data).version));' || true)
+          fi
+
+          if [[ "$current" == "$previous" ]]; then
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            echo "The version was not bumped; nothing to release."
+            exit 0
+          fi
+
+          if [[ ! "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release version: $current" >&2
+            exit 1
+          fi
+
+          if git rev-parse -q --verify "refs/tags/v$current" >/dev/null; then
+            echo "Tag v$current already exists" >&2
+            exit 1
+          fi
+
+          echo "bumped=true" >> "$GITHUB_OUTPUT"
+          echo "version=$current" >> "$GITHUB_OUTPUT"
+          echo "tag=v$current" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        if: steps.version.outputs.bumped == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Set up npm
+        if: steps.version.outputs.bumped == 'true'
+        run: npm install --global npm@12.0.2
+
+      - name: Validate synchronized release version
+        if: steps.version.outputs.bumped == 'true'
+        run: |
+          npm ci
+          npm run check-version
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: prepare
+    if: needs.prepare.outputs.bumped == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            platform: macos-latest
+            command: package:mac
+          - name: Windows
+            platform: windows-latest
+            command: package:win
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            launcher/package-lock.json
+
+      - name: Set up npm
+        run: npm install --global npm@12.0.2
+
+      - name: Build native launcher
+        run: npm --prefix launcher run ${{ matrix.command }}
+
+      - name: Smoke-test packaged launcher
+        run: npm --prefix launcher run smoke:package
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ runner.os }}
+          path: |
+            launcher/artifacts/*.dmg
+            launcher/artifacts/*.zip
+            launcher/artifacts/*.exe
+            launcher/artifacts/*.blockmap
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish
+    needs: [prepare, build]
+    if: needs.prepare.outputs.bumped == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v4
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: release-assets
+        run: sha256sum * > checksums.txt
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          gh release create "$TAG" \
+            release-assets/* \
+            scripts/install-launcher.sh \
+            scripts/install-launcher.ps1 \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --generate-notes
