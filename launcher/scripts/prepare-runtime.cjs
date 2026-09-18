@@ -5,28 +5,20 @@ const path = require("node:path");
 const launcherRoot = path.resolve(__dirname, "..");
 const repositoryRoot = path.resolve(launcherRoot, "..");
 const output = path.join(launcherRoot, "build", "runtime");
-const bun = process.env.CODAX_BUN || process.execPath;
+const npmExecutable = process.platform === "win32" ? "npm.cmd" : "npm";
 
-const result = spawnSync(bun, ["run", "scripts/build-runtime-bundle.ts", output], {
-  cwd: repositoryRoot,
-  env: process.env,
-  stdio: "inherit",
-});
+function run(args) {
+  const result = spawnSync(npmExecutable, ["--prefix", repositoryRoot, ...args], {
+    cwd: launcherRoot,
+    env: process.env,
+    stdio: "inherit",
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
 
-if (result.error) throw result.error;
-if (result.status !== 0) process.exit(result.status ?? 1);
-
-const notices = spawnSync(bun, [
-  "run",
-  "scripts/generate-third-party-notices.ts",
-  path.join(output, "THIRD_PARTY_NOTICES.txt"),
-  "--include-launcher",
-], {
-  cwd: repositoryRoot,
-  env: process.env,
-  stdio: "inherit",
-});
-if (notices.error) throw notices.error;
-if (notices.status !== 0) process.exit(notices.status ?? 1);
+run(["ci"]);
+run(["run", "build", "--", output]);
+run(["run", "licenses", "--", path.join(output, "THIRD_PARTY_NOTICES.txt")]);
 fs.copyFileSync(path.join(repositoryRoot, "LICENSE"), path.join(output, "LICENSE"));
 fs.cpSync(path.join(repositoryRoot, "LICENSES"), path.join(output, "LICENSES"), { recursive: true });

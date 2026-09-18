@@ -7,9 +7,10 @@ usable.
 
 ## Prerequisites
 
-- Use the repository-pinned Bun version.
+- Install dependencies with npm in the repository root and in `launcher/`.
+- The repository-pinned Bun runtime is installed as an npm dependency.
 - Install a launcher built from the same working tree.
-- Start the isolated launcher with `bun run dev:launcher`.
+- Start the isolated launcher with `npm run dev:launcher`.
 - It skips the normal marketing onboarding and opens the setup surface directly. Sign in inside the
   window labelled **DEV**. This may be a different ChatGPT account.
 - Run its browser smoke test and initialize the DEV profile. Complete MCP setup only when testing
@@ -26,21 +27,21 @@ profile, another model, a fake browser, or a second connector.
 One browser-only message:
 
 ```bash
-bun run dev:launcher
-bun run src/cli.ts dev status
-bun run dev:chat smoke "Reply with exactly: DEV READY"
+npm run dev:launcher
+npm exec -- bun run src/cli.ts dev status
+npm run dev:chat -- smoke "Reply with exactly: DEV READY"
 ```
 
 Persistent interactive chat:
 
 ```bash
-bun run dev:chat compaction-lab
+npm run dev:chat -- compaction-lab
 ```
 
 After optional Full/MCP setup, the same command also exposes simulated outer tools:
 
 ```bash
-bun run dev:chat tool-lab "Use a command tool and explain the simulated receipt"
+npm run dev:chat -- tool-lab "Use a command tool and explain the simulated receipt"
 ```
 
 The direct DEV tool `mcp__dev_simulator__large_context_payload` accepts the explicit arguments

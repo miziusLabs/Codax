@@ -11,7 +11,7 @@
   "bugs": {
     "url": "https://github.com/miziusLabs/Codex/issues"
   },
-  "packageManager": "bun@1.4.0",
+  "packageManager": "npm@12.0.2",
   "type": "module",
   "bin": {
     "codax": "./src/cli.ts"
@@ -23,33 +23,33 @@
     "LICENSES"
   ],
   "scripts": {
-    "start": "bun run src/cli.ts serve",
-    "setup": "bun run src/cli.ts setup",
-    "doctor": "bun run src/cli.ts doctor",
-    "dev:launcher": "bun run src/cli.ts dev launcher",
-    "dev:chat": "bun run src/cli.ts dev chat",
-    "test": "bun test tests/*.test.ts",
-    "audit": "bun audit",
-    "check-version": "bun run scripts/check-version.ts",
-    "typecheck": "bunx tsc --noEmit",
-    "licenses": "bun run scripts/generate-third-party-notices.ts --include-launcher",
-    "clean": "bun run scripts/clean.ts",
-    "build": "bun run scripts/build-runtime-bundle.ts",
-    "smoke": "bun run scripts/smoke-release.ts dist/runtime",
-    "smoke:codex": "bun run scripts/smoke-codex-catalog.ts",
-    "smoke:cancel": "bun run scripts/smoke-codex-cancel.ts",
-    "smoke:subagents": "bun run scripts/smoke-codex-subagents.ts --v1 && bun run scripts/smoke-codex-subagents.ts --v2",
-    "smoke:subagents:live": "bun run scripts/smoke-codex-web-subagents.ts",
-    "launcher": "bun run scripts/start-launcher.ts",
-    "app": "bun run scripts/start-launcher.ts",
-    "app:package": "\"$npm_execpath\" run --cwd launcher package",
-    "app:smoke": "bun run --cwd launcher smoke:package",
-    "launcher:dev": "bun run --cwd launcher dev",
-    "launcher:audit": "bun run --cwd launcher audit",
-    "launcher:typecheck": "bun run --cwd launcher typecheck",
-    "launcher:build": "bun run --cwd launcher build",
-    "launcher:test": "bun run --cwd launcher test",
-    "verify": "bun run scripts/verify.ts"
+    "start": "npm exec -- bun run src/cli.ts serve",
+    "setup": "npm exec -- bun run src/cli.ts setup",
+    "doctor": "npm exec -- bun run src/cli.ts doctor",
+    "dev:launcher": "npm exec -- bun run src/cli.ts dev launcher",
+    "dev:chat": "npm exec -- bun run src/cli.ts dev chat",
+    "test": "npm exec -- bun test tests/*.test.ts",
+    "audit": "npm audit",
+    "check-version": "npm exec -- bun run scripts/check-version.ts",
+    "typecheck": "npm exec -- tsc --noEmit",
+    "licenses": "npm exec -- bun run scripts/generate-third-party-notices.ts --include-launcher",
+    "clean": "npm exec -- bun run scripts/clean.ts",
+    "build": "npm exec -- bun run scripts/build-runtime-bundle.ts",
+    "smoke": "npm exec -- bun run scripts/smoke-release.ts",
+    "smoke:codex": "npm exec -- bun run scripts/smoke-codex-catalog.ts",
+    "smoke:cancel": "npm exec -- bun run scripts/smoke-codex-cancel.ts",
+    "smoke:subagents": "npm exec -- bun run scripts/smoke-codex-subagents.ts --v1 && npm exec -- bun run scripts/smoke-codex-subagents.ts --v2",
+    "smoke:subagents:live": "npm exec -- bun run scripts/smoke-codex-web-subagents.ts",
+    "launcher": "npm exec -- bun run scripts/start-launcher.ts",
+    "app": "npm exec -- bun run scripts/start-launcher.ts",
+    "app:package": "npm --prefix launcher run package",
+    "app:smoke": "npm --prefix launcher run smoke:package",
+    "launcher:dev": "npm --prefix launcher run dev",
+    "launcher:audit": "npm --prefix launcher run audit",
+    "launcher:typecheck": "npm --prefix launcher run typecheck",
+    "launcher:build": "npm --prefix launcher run build",
+    "launcher:test": "npm --prefix launcher run test",
+    "verify": "npm exec -- bun run scripts/verify.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
@@ -63,6 +63,7 @@
   "devDependencies": {
     "@types/bun": "1.4.0",
     "@types/turndown": "5.0.5",
+    "bun": "1.4.0",
     "typescript": "5.9.3"
   },
   "engines": {
@@ -81,5 +82,8 @@
     "mcp",
     "playwright"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "allowScripts": {
+    "bun@1.4.0": true
+  }
 }

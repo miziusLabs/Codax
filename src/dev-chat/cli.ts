@@ -38,9 +38,9 @@ Usage:
   codax dev list
 
 Repository shortcut:
-  bun run dev:launcher
-  bun run dev:chat NAME "message"
-  bun run dev:chat NAME
+  npm run dev:launcher
+  npm run dev:chat -- NAME "message"
+  npm run dev:chat -- NAME
 
 Interactive commands:
   /status              Show estimated next-turn context occupancy
@@ -156,7 +156,7 @@ async function assertLauncherReady(config: ReturnType<typeof loadConfig>): Promi
     throw new Error("DEV chat requires a configuration created inside the isolated DEV profile");
   }
   if (config.browserHost !== "launcher" || !config.browserHostDescriptorPath) {
-    throw new Error("DEV chat requires the isolated desktop launcher; run bun run dev:launcher first");
+    throw new Error("DEV chat requires the isolated desktop launcher; run npm run dev:launcher first");
   }
   await inspectLauncherBrowserHost(config.browserHostDescriptorPath, {
     expectedProfile: DEV_LAUNCHER_PROFILE,

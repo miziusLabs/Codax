@@ -101,10 +101,11 @@ model API key, installed Chrome/Chromium, system Node/Bun, or project-managed br
 ```bash
 git clone https://github.com/miziusLabs/Codex.git codax && \
 cd codax && \
-bun run app
+npm run app
 ```
 
-This source path requires Bun 1.4.0. The command installs locked dependencies and opens the app.
+This source path requires Bun 1.4.0. Install dependencies with `npm ci` in the repository root and
+`launcher/`, then run the app with npm.
 
 ## Modes
 
@@ -185,13 +186,13 @@ Read the complete [architecture](docs/architecture.md) and
 ## Development
 
 ```bash
-bun run app
-bun run dev:launcher
-bun run src/cli.ts dev status
-bun run dev:chat compaction-lab "Reply with exactly: DEV READY"
-bun run verify
-bun run smoke:subagents
-bun run app:package
+npm run app
+npm run dev:launcher
+npm exec -- bun run src/cli.ts dev status
+npm run dev:chat -- compaction-lab "Reply with exactly: DEV READY"
+npm run verify
+npm run smoke:subagents
+npm run app:package
 ```
 
 `app:package` installs the locked launcher and runtime dependencies before building. Native

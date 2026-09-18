@@ -7,17 +7,17 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "bun run scripts/dev.cjs",
-    "audit": "bun audit",
+    "dev": "npm exec -- bun run scripts/dev.cjs",
+    "audit": "npm audit",
     "typecheck": "tsc --noEmit",
     "build:renderer": "vite build",
-    "build": "\"$npm_execpath\" install --frozen-lockfile && \"$npm_execpath\" run typecheck && \"$npm_execpath\" run build:renderer",
-    "build:runtime": "\"$npm_execpath\" install --cwd .. --frozen-lockfile && \"$npm_execpath\" run scripts/prepare-runtime.cjs",
-    "package": "\"$npm_execpath\" run build && \"$npm_execpath\" run build:runtime && \"$npm_execpath\" run scripts/package.cjs",
-    "package:mac": "\"$npm_execpath\" run build && \"$npm_execpath\" run build:runtime && \"$npm_execpath\" run scripts/package.cjs --mac",
-    "package:win": "\"$npm_execpath\" run build && \"$npm_execpath\" run build:runtime && \"$npm_execpath\" run scripts/package.cjs --win",
-    "package:linux": "\"$npm_execpath\" run build && \"$npm_execpath\" run build:runtime && \"$npm_execpath\" run scripts/package.cjs --linux",
-    "smoke:package": "bun run scripts/smoke-package.cjs",
+    "build": "npm ci && npm run typecheck && npm run build:renderer",
+    "build:runtime": "node scripts/prepare-runtime.cjs",
+    "package": "npm run build && npm run build:runtime && node scripts/package.cjs",
+    "package:mac": "npm run build && npm run build:runtime && node scripts/package.cjs --mac",
+    "package:win": "npm run build && npm run build:runtime && node scripts/package.cjs --win",
+    "package:linux": "npm run build && npm run build:runtime && node scripts/package.cjs --linux",
+    "smoke:package": "node scripts/smoke-package.cjs",
     "test": "node --test tests/*.test.cjs",
     "start": "electron ."
   },
@@ -31,6 +31,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "bun": "1.4.0",
     "electron": "41.10.7",
     "electron-builder": "^26.8.1",
     "typescript": "^5.9.3",
@@ -65,16 +66,23 @@
       "icon": "assets/icon.png",
       "minimumSystemVersion": "13.0",
       "hardenedRuntime": true,
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "win": {
       "icon": "assets/icon.ico",
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "linux": {
       "category": "Development",
       "icon": "assets/icon.png",
-      "target": ["AppImage"]
+      "target": [
+        "AppImage"
+      ]
     },
     "nsis": {
       "guid": "d1a6026a-6210-588e-9a2b-da3936f94e02",
@@ -85,5 +93,12 @@
       "createStartMenuShortcut": true,
       "runAfterFinish": true
     }
+  },
+  "allowScripts": {
+    "bun@1.4.0": true,
+    "electron@41.10.7": true,
+    "electron-winstaller@5.4.0": true,
+    "esbuild@0.25.12": true,
+    "fsevents@2.3.3": true
   }
 }

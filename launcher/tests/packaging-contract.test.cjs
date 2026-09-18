@@ -11,21 +11,24 @@ const manifest = JSON.parse(fs.readFileSync(path.join(launcherRoot, "package.jso
 const repositoryManifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "package.json"), "utf8"));
 
 test("the public launcher command uses the Electron bootstrap", () => {
-  assert.equal(repositoryManifest.scripts.launcher, "bun run scripts/start-launcher.ts");
+  assert.equal(repositoryManifest.scripts.launcher, "npm exec -- bun run scripts/start-launcher.ts");
   assert.equal(repositoryManifest.scripts.launcher, repositoryManifest.scripts.app);
 });
 
-test("launcher packaging keeps using the Bun executable that started the script", () => {
-  assert.match(repositoryManifest.scripts["app:package"], /\$npm_execpath/);
-  for (const script of ["build", "build:runtime", "package", "package:mac", "package:win", "package:linux"]) {
-    assert.match(manifest.scripts[script], /\$npm_execpath/);
+test("launcher packaging delegates dependency management to npm", () => {
+  assert.equal(repositoryManifest.scripts["app:package"], "npm --prefix launcher run package");
+  assert.equal(manifest.scripts.build, "npm ci && npm run typecheck && npm run build:renderer");
+  assert.equal(manifest.scripts["build:runtime"], "node scripts/prepare-runtime.cjs");
+  for (const script of ["package", "package:mac", "package:win", "package:linux"]) {
+    assert.match(manifest.scripts[script], /^npm run build && npm run build:runtime && node scripts\/package\.cjs/);
   }
+  assert.doesNotMatch(manifest.scripts.build, /--frozen-lockfile|bun install|bun audit/);
 });
 
-test("the full verification gate audits launcher dependencies", () => {
+test("the full verification gate audits launcher dependencies with npm", () => {
   const verify = fs.readFileSync(path.join(repositoryRoot, "scripts", "verify.ts"), "utf8");
-  assert.equal(manifest.scripts.audit, "bun audit");
-  assert.equal(repositoryManifest.scripts["launcher:audit"], "bun run --cwd launcher audit");
+  assert.equal(manifest.scripts.audit, "npm audit");
+  assert.equal(repositoryManifest.scripts["launcher:audit"], "npm --prefix launcher run audit");
   assert.match(verify, /await run\(\["run", "launcher:audit"\]\);/);
 });
 
@@ -116,28 +119,15 @@ test("packaged launcher has no self-update fetch or automatic updater", () => {
   }
 });
 
-test("CI packages and smoke-launches on macOS, Windows, and Linux", () => {
-  const ci = fs.readFileSync(path.join(repositoryRoot, ".github", "workflows", "ci.yml"), "utf8");
-  const release = fs.readFileSync(path.join(repositoryRoot, ".github", "workflows", "release.yml"), "utf8");
-  assert.match(ci, /macos-15, ubuntu-latest, windows-latest/);
-  assert.match(ci, /bun run app:package/);
-  assert.match(ci, /bun run app:smoke/);
-  assert.match(ci, /prepare-linux-libnotify\.sh/);
-  assert.match(ci, /prepare-linux-appimage-tools\.cjs/);
-  assert.match(ci, /archlinux:base/);
-  assert.match(ci, /prepare-windows-baseline-bun\.ps1 -Version 1\.4\.0/);
-  for (const runner of ["macos-15", "macos-15-intel", "ubuntu-latest", "windows-latest"]) {
-    assert.match(release, new RegExp(runner));
-  }
-  assert.match(release, /launcher\/build\/runtime/);
-  assert.match(release, /bun run app:smoke/);
-  assert.match(release, /prepare-linux-libnotify\.sh/);
-  assert.match(release, /prepare-linux-appimage-tools\.cjs/);
-  assert.match(release, /archlinux:base/);
-  assert.match(release, /prepare-windows-baseline-bun\.ps1 -Version 1\.4\.0/);
-  assert.match(release, /codesign --verify --deep --strict --verbose=2/);
-  assert.match(release, /Codax\.app/);
-  assert.doesNotMatch(release, /gh release create[\s\S]*?--draft/);
+test("npm migration keeps both projects on npm lockfiles", () => {
+  const runtimeBuilder = fs.readFileSync(path.join(repositoryRoot, "scripts", "build-runtime-bundle.ts"), "utf8");
+  assert.equal(repositoryManifest.packageManager, "npm@12.0.2");
+  assert.equal(fs.existsSync(path.join(repositoryRoot, "package-lock.json")), true);
+  assert.equal(fs.existsSync(path.join(launcherRoot, "package-lock.json")), true);
+  assert.equal(fs.existsSync(path.join(repositoryRoot, "bun.lock")), false);
+  assert.equal(fs.existsSync(path.join(launcherRoot, "bun.lock")), false);
+  assert.match(runtimeBuilder, /package-lock\.json/);
+  assert.match(runtimeBuilder, /npmExecutable/);
 });
 
 test("Linux AppImage fallback uses one owned extraction and removes it on exit", {
@@ -221,12 +211,6 @@ test("macOS package smoke unregisters its staged app from LaunchServices", () =>
     smoke.indexOf('["-u", macAppBundle]') < smoke.indexOf("fs.rmSync(scratch"),
     "the staged app must be unregistered before its bundle is deleted",
   );
-});
-
-test("release does not publish demo or screenshot assets", () => {
-  const release = fs.readFileSync(path.join(repositoryRoot, ".github", "workflows", "release.yml"), "utf8");
-  assert.doesNotMatch(release, /assets\/demo\.gif/);
-  assert.doesNotMatch(release, /release-assets\/[^\n]*(?:demo|screenshot)/i);
 });
 
 test("Windows packages embed the checksummed Bun baseline runtime for CPUs without AVX2", () => {

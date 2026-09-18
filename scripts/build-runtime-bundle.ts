@@ -7,11 +7,14 @@ const root = resolve(import.meta.dir, "..");
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
   version?: string;
   packageManager?: string;
+  engines?: Record<string, string>;
 };
 if (packageJson.version !== VERSION) throw new Error("package.json and runtime version are out of sync");
-const packageManagerMatch = /^bun@(\d+\.\d+\.\d+)$/.exec(packageJson.packageManager ?? "");
-if (!packageManagerMatch) throw new Error("package.json must pin an exact Bun packageManager version");
-const expectedBunVersion = packageManagerMatch[1];
+if (!/^npm@(\d+\.\d+\.\d+)$/.test(packageJson.packageManager ?? "")) {
+  throw new Error("package.json must pin an exact npm packageManager version");
+}
+const expectedBunVersion = packageJson.engines?.bun;
+if (!expectedBunVersion) throw new Error("package.json must pin an exact Bun engine version");
 if (Bun.version !== expectedBunVersion) {
   throw new Error(`Runtime bundle requires Bun ${expectedBunVersion}, received ${Bun.version}`);
 }
@@ -69,16 +72,16 @@ if (!browserHelperBuild.success) {
 }
 
 copyFileSync(join(root, "package.json"), join(appDir, "package.json"));
-copyFileSync(join(root, "bun.lock"), join(appDir, "bun.lock"));
+copyFileSync(join(root, "package-lock.json"), join(appDir, "package-lock.json"));
+const npmExecutable = process.platform === "win32" ? "npm.cmd" : "npm";
 const install = Bun.spawnSync([
-  process.execPath,
-  "install",
-  "--production",
-  "--frozen-lockfile",
+  npmExecutable,
+  "ci",
+  "--omit=dev",
   "--ignore-scripts",
   "--registry",
   "https://registry.npmjs.org",
-  "--network-concurrency",
+  "--maxsockets",
   "1",
 ], {
   cwd: appDir,
@@ -124,7 +127,7 @@ if (process.platform !== "win32") chmodSync(join(binDir, launcherName), 0o755);
 
 const playwrightPackage = join(appDir, "node_modules", "playwright-core", "package.json");
 const bundleId = createHash("sha256");
-for (const relativePath of ["app/cli.js", "app/browser-helper.cjs", "app/package.json", "app/bun.lock"]) {
+for (const relativePath of ["app/cli.js", "app/browser-helper.cjs", "app/package.json", "app/package-lock.json"]) {
   bundleId.update(relativePath);
   bundleId.update("\0");
   bundleId.update(readFileSync(join(output, relativePath)));
