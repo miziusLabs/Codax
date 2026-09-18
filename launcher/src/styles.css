@@ -248,11 +248,6 @@ code {
   background: rgb(33 33 33 / 78%);
 }
 
-.app-root[data-platform="darwin"] .app-sidebar {
-  backdrop-filter: blur(28px) saturate(1.08);
-  -webkit-backdrop-filter: blur(28px) saturate(1.08);
-}
-
 .app-shell.is-compact .app-sidebar {
   position: absolute;
   z-index: 40;
@@ -443,11 +438,6 @@ code {
   padding-top: 0;
   overflow: hidden;
   background: rgb(24 24 24 / 90%);
-}
-
-.app-root[data-platform="darwin"] .workspace {
-  backdrop-filter: blur(22px) saturate(1.04);
-  -webkit-backdrop-filter: blur(22px) saturate(1.04);
 }
 
 .surface-transition {
@@ -752,6 +742,13 @@ code {
   to {
     transform: translateX(360%);
   }
+}
+
+html[data-window-active="false"] .state-dot.is-busy,
+html[data-window-active="false"] .tab-spinner,
+html[data-window-active="false"] .browser-loading-line::after,
+html[data-window-active="false"] .launch-loading > span::after {
+  animation-play-state: paused;
 }
 
 .browser-viewport {
@@ -1696,11 +1693,6 @@ code {
   overflow: hidden;
   background: rgb(24 24 24 / 88%);
   color: var(--color-text-primary);
-}
-
-.app-root[data-platform="darwin"] .welcome {
-  backdrop-filter: blur(28px) saturate(1.06);
-  -webkit-backdrop-filter: blur(28px) saturate(1.06);
 }
 
 .welcome-top {

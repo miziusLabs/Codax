@@ -151,6 +151,12 @@ class BrowserControlServer {
       }
       const preferences = this.getPreferences();
       if (request.url === "/v1/turn/start") {
+        await host.waitForTurnCapacity?.(
+          body.traceId,
+          body.conversationKey,
+          body.connectorIdentity,
+          body.requireRetainedConversation === true,
+        );
         const lease = host.beginTurn(
           body.traceId,
           preferences.showBrowserDuringTurns === true,

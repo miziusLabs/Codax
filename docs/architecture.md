@@ -7,7 +7,7 @@ Codex app / CLI
 launcher-owned codax daemon
   ├─ official /models passthrough + fixed ChatGPT Web models
   ├─ native Responses passthrough or ChatGPT Responses/SSE bridge
-  ├─ ChatGPT browser worker (up to five task-bound Electron tabs)
+  ├─ ChatGPT browser worker (one active task-bound Electron tab)
   ├─ capability broker (full mode only)
   └─ stdio MCP server
             ▲
@@ -76,15 +76,16 @@ and development connectors installed without renaming, refreshing, or deleting e
 
 ## Browser lifecycle
 
-The desktop launcher owns one persistent Electron partition and up to five concurrently active
-task-bound browser tabs. Each ChatGPT response owns one `WebContentsView` lease and receives a fresh
+The desktop launcher owns one persistent Electron partition and runs one task-bound browser tab at a
+time. Concurrent ChatGPT turns queue until that slot is released. Each response owns one
+`WebContentsView` lease and receives a fresh
 turn-bound MCP token. All MCP tool rounds for that response stay inside the same browser document,
 but the document is destroyed as soon as the response reaches a terminal state. Sequential native
 messages therefore open fresh Temporary Chats and rebuild their context from canonical Codex
 history instead of relying on browser-local conversation state. Tabs share only the local login
 partition and keep independent documents and lifecycles. Closing a running tab destroys its page
-and terminates that browser turn. A sixth concurrent turn fails explicitly; the cap avoids excessive
-parallel traffic that could trigger account abuse controls.
+and terminates that browser turn. Serializing active browser turns bounds both renderer memory and
+parallel account traffic.
 
 Sign-in uses that same persistent Electron partition. ChatGPT login pages and allowed identity-
 provider popups are adopted into a temporary `WebContentsView` inside the launcher instead of being
@@ -188,7 +189,7 @@ launcher error.
 - Store browser state and tunnel credentials under the application home with mode `0600`.
 - Protect lifecycle control endpoints with a random application-owned bearer token.
 - Never place secret values in command-line arguments, logs, generated profiles, or Git.
-- Limit browser turns to five independent task-bound tabs and reject unsupported models explicitly.
+- Limit browser turns to one active task-bound tab and queue concurrent turns. Reject unsupported models explicitly.
   The selected routed model fixes the adapter effort; a conflicting request effort cannot change it.
 - Do not retry or switch modes to evade product usage limits.
 

@@ -81,11 +81,12 @@ external browser.
 
 ### Cross-turn data leakage
 
-Browser turns use at most five independent task-bound tabs in one private login partition. Every
+Browser turns use one active task-bound tab at a time in one private login partition. Concurrent
+turns queue until the active tab is released. Every
 outer Codex task owns an exact launcher surface lease and retains its Temporary Chat only across
 sequential messages in the same model/effort/compaction epoch; chats are never reused across tasks.
-Closing a running tab destroys its page and terminates that turn. The five-tab limit bounds parallel
-account traffic. Tool calls remain in the same ChatGPT response. The
+Closing a running tab destroys its page and terminates that turn. The single active-tab limit bounds
+parallel account traffic. Tool calls remain in the same ChatGPT response. The
 bounded local continuation cache is private, expires, and exists only to implement Codex
 `previous_response_id` replay. Full-mode context compaction accepts a checkpoint only through its
 one-shot MCP control capability in the exact retained source chat. If that chat no longer exists, a

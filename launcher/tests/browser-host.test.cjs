@@ -1832,16 +1832,36 @@ test("a required retained conversation fails before creating a browser tab", () 
   assert.equal(created, false);
 });
 
-test("five browser tabs are a hard account-safety limit", () => {
-  const turnTabs = new Map(Array.from({ length: 5 }, (_unused, index) => [
-    `tab-${index + 1}`,
-    { ordinal: index + 1 },
-  ]));
+test("one browser tab is the hard concurrency limit", () => {
+  const turnTabs = new Map([["tab-1", { ordinal: 1 }]]);
 
   assert.throws(
-    () => BrowserHost.prototype.createTurnTab.call({ turnTabs }, "trace_six", 444),
-    /already has 5 browser tabs.*avoid excessive parallel traffic/,
+    () => BrowserHost.prototype.createTurnTab.call({ turnTabs }, "trace_two", 444),
+    /already has 1 browser tab.*avoid excessive parallel traffic/,
   );
+});
+
+test("a second browser turn waits for the active tab slot", async () => {
+  const fixture = Object.create(BrowserHost.prototype);
+  fixture.manualOperation = null;
+  fixture.userCancelledTurnOwners = new Map();
+  fixture.turnSlotWaiters = [];
+  fixture.turnTabs = new Map([[
+    "active",
+    { traceId: "trace_one", status: "running" },
+  ]]);
+
+  let resolved = false;
+  const waiting = fixture.waitForTurnCapacity("trace_two").then(() => {
+    resolved = true;
+  });
+  await Promise.resolve();
+  assert.equal(resolved, false);
+
+  fixture.turnTabs.clear();
+  fixture.notifyTurnSlotAvailable();
+  await waiting;
+  assert.equal(resolved, true);
 });
 
 test("a full browser host evicts only its oldest ready tab", () => {

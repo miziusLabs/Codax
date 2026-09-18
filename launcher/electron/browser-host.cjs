@@ -22,7 +22,7 @@ const TEMPORARY_CHAT_URL = "https://chatgpt.com/?temporary-chat=true";
 const CHATGPT_ORIGIN = "https://chatgpt.com";
 const IDLE_BROWSER_URL = "about:blank#codax-browser-host";
 const MAX_BROWSER_VIEW_DIMENSION = 16_384;
-const MAX_BROWSER_TABS = 5;
+const MAX_BROWSER_TABS = 1;
 const MAX_CANCELLED_TURN_TRACES = 256;
 const MAX_CLOSED_TURN_TRACES = 256;
 const HIDDEN_TURN_VIEWPORT = Object.freeze({ width: 800, height: 600 });
@@ -121,7 +121,7 @@ function ownedSurfaceScript(surfaceId) {
       const anchor = sidebarAnchors
         .map(selector => document.querySelector(selector))
         .find(Boolean);
-      if (!anchor) return;
+      if (!anchor) return null;
       let candidate = null;
       for (let element = anchor; element && element !== document.body; element = element.parentElement) {
         const bounds = element.getBoundingClientRect();
@@ -133,22 +133,23 @@ function ownedSurfaceScript(surfaceId) {
           candidate = element;
         }
       }
-      if (!candidate) return;
+      if (!candidate) return null;
       document.querySelectorAll('[data-codax-sidebar="true"]').forEach((element) => {
         if (element !== candidate) element.removeAttribute('data-codax-sidebar');
       });
       candidate.setAttribute('data-codax-sidebar', 'true');
+      return candidate;
     };
-    markSidebar();
+    let markedSidebar = markSidebar();
     if (!globalThis.__CODAX_CHROME_OBSERVER__) {
       let pending = false;
       const observer = new MutationObserver(() => {
-        if (pending) return;
+        if (markedSidebar?.isConnected || pending) return;
         pending = true;
-        requestAnimationFrame(() => {
+        setTimeout(() => {
           pending = false;
-          markSidebar();
-        });
+          markedSidebar = markSidebar();
+        }, 500);
       });
       observer.observe(document.documentElement, { childList: true, subtree: true });
       Object.defineProperty(globalThis, "__CODAX_CHROME_OBSERVER__", {
@@ -308,6 +309,7 @@ class BrowserHost {
     this.visible = false;
     this.surfaceActive = true;
     this.turnTabs = new Map();
+    this.turnSlotWaiters = [];
     this.closedTurnOwners = new Map();
     this.userCancelledTurnOwners = new Map();
     this.selectedTabId = "home";
@@ -399,11 +401,47 @@ class BrowserHost {
     return this.turnTabs.get(this.selectedTabId) || null;
   }
 
+  canBeginTurn(traceId, conversationKey, connectorIdentity, requireRetainedConversation = false) {
+    if (this.manualOperation || this.userCancelledTurnOwners.has(traceId) || requireRetainedConversation) {
+      return true;
+    }
+    const tabs = [...this.turnTabs.values()];
+    if (tabs.some((tab) => tab.traceId === traceId)) return true;
+    if (conversationKey && tabs.some((tab) => (
+      tab.status === "ready"
+      && tab.conversationKey === conversationKey
+      && tab.connectorIdentity === connectorIdentity
+      && (!connectorIdentity || tab.connectorBound === true)
+    ))) return true;
+    return tabs.length < MAX_BROWSER_TABS || tabs.some((tab) => tab.status === "ready");
+  }
+
+  async waitForTurnCapacity(
+    traceId,
+    conversationKey,
+    connectorIdentity,
+    requireRetainedConversation = false,
+  ) {
+    while (!this.canBeginTurn(
+      traceId,
+      conversationKey,
+      connectorIdentity,
+      requireRetainedConversation,
+    )) {
+      await new Promise((resolve, reject) => this.turnSlotWaiters.push({ resolve, reject }));
+    }
+  }
+
+  notifyTurnSlotAvailable() {
+    this.turnSlotWaiters?.shift()?.resolve();
+  }
+
   createTurnTab(traceId, helperPid, conversationKey, connectorIdentity) {
     if (this.turnTabs.size >= MAX_BROWSER_TABS
       && !BrowserHost.prototype.evictOldestRetainedTurnTab.call(this)) {
+      const tabLabel = MAX_BROWSER_TABS === 1 ? "browser tab" : "browser tabs";
       throw new Error(
-        `ChatGPT Web already has ${MAX_BROWSER_TABS} browser tabs; close one before starting another turn to avoid excessive parallel traffic on the ChatGPT account`,
+        `ChatGPT Web already has ${MAX_BROWSER_TABS} ${tabLabel}; close one before starting another turn to avoid excessive parallel traffic on the ChatGPT account`,
       );
     }
     const id = randomBytes(12).toString("base64url");
@@ -1118,6 +1156,7 @@ class BrowserHost {
     this.syncViewVisibility();
     this.publishState?.(this.snapshot());
     this.writeDescriptor();
+    this.notifyTurnSlotAvailable();
   }
 
   rememberUserCancelledTurn(traceId, helperPid) {
@@ -1924,6 +1963,8 @@ class BrowserHost {
       if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
     }
     this.turnTabs.clear();
+    const destroyed = new Error("Browser host was closed while waiting for a browser turn");
+    for (const waiter of this.turnSlotWaiters.splice(0)) waiter.reject(destroyed);
     if (this.view && !this.view.webContents.isDestroyed()) this.view.webContents.close();
   }
 }

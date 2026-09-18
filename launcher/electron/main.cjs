@@ -286,7 +286,7 @@ function createWindow({ logger, stateStore, windowStatePath, startHidden }) {
     ...(isMac ? {
       trafficLightPosition: { x: 16, y: 17 },
       vibrancy: "under-window",
-      visualEffectState: "active",
+      visualEffectState: "followWindow",
     } : {
       titleBarOverlay: {
         color: "#181818",

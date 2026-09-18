@@ -37,6 +37,28 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const updateWindowActivity = () => {
+      document.documentElement.dataset.windowActive = document.visibilityState === "visible"
+        && document.hasFocus()
+        ? "true"
+        : "false";
+    };
+    const markWindowInactive = () => {
+      document.documentElement.dataset.windowActive = "false";
+    };
+    updateWindowActivity();
+    window.addEventListener("focus", updateWindowActivity);
+    window.addEventListener("blur", markWindowInactive);
+    document.addEventListener("visibilitychange", updateWindowActivity);
+    return () => {
+      window.removeEventListener("focus", updateWindowActivity);
+      window.removeEventListener("blur", markWindowInactive);
+      document.removeEventListener("visibilitychange", updateWindowActivity);
+      delete document.documentElement.dataset.windowActive;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!api) return;
     let cancelled = false;
     void api.snapshot().then((next) => {

@@ -35,7 +35,7 @@ export const copy = {
   showSidebar: "Show sidebar",
   resizeSidebar: "Resize sidebar",
   hideTab: "Close tab",
-  browserTabLimit: "Up to five simultaneous ChatGPT Web tabs. The limit avoids excessive parallel traffic on your ChatGPT account.",
+  browserTabLimit: "One active ChatGPT Web tab at a time. Concurrent turns queue until it is available.",
   browserAddress: "ChatGPT browser",
   noActiveTask: "No active task",
   noActiveTaskBody: "ChatGPT will appear here when Codex starts a Web model turn.",
